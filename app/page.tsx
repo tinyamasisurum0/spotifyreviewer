@@ -41,6 +41,7 @@ export default function Home() {
         </form>
         {playlistId && <PlaylistAnalyzer playlistId={playlistId} />}
       </div>
+      <div><p className="text-center m-6">Made by <a className='font-extrabold	underline' target='_blank' href="https://x.com/tinyamasisurum0">tinyamasisurum0</a> - Messages on X for feature requests are appreciated.</p></div>
     </DragDropContext>
   )
 }

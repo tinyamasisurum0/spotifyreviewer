@@ -239,7 +239,6 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
       >
         Download as JPEG
       </button>
-      <p>Made by <a className='font-extrabold	' target='_blank' href="https://x.com/tinyamasisurum0">tinyamasisurum0</a> </p>
     </div>
   );
 }
