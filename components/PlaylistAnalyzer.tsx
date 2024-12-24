@@ -98,6 +98,12 @@ function SortableAlbumItem({ album, index, onNotesChange }: SortableAlbumItemPro
   );
 }
 
+interface SpotifyTrack {
+  track: {
+    album: Album;
+  };
+}
+
 export default function PlaylistAnalyzer({ playlistId }: { playlistId: string }) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +133,7 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
         setPlaylistName(name);
         setPlaylistOwner(owner);
 
-        const uniqueAlbums = tracks.reduce((acc: Album[], item: any) => {
+        const uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
           const album = item.track.album;
           if (!acc.find((a) => a.name === album.name)) {
             acc.push({
@@ -139,7 +145,7 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
           return acc;
         }, []);
         setAlbums(uniqueAlbums);
-      } catch (err) {
+      } catch {
         setError('Wrong playlist URL. Please ensure to paste a playlist URL');
       } finally {
         setLoading(false);
