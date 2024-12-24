@@ -129,7 +129,7 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
         setLoading(true);
         setError(null);
         const tracks = await getPlaylistTracks(playlistId);
-        const { name, owner } = await getPlaylistDetails(playlistId);
+        const { name, owner } = await getPlaylistDetails(playlistId); 
         setPlaylistName(name);
         setPlaylistOwner(owner);
 
