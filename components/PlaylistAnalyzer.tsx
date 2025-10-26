@@ -19,8 +19,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
+import { Star, StarHalf, Trash2 } from 'lucide-react';
 
 
+
+export type InputMode = 'review' | 'rating' | 'both';
 
 interface Album {
   id: string;
@@ -29,15 +32,19 @@ interface Album {
   artists: { name: string }[];
   release_date: string;
   notes: string;
+  rating: number | null;
 }
 
 interface SortableAlbumItemProps {
   album: Album;
   index: number;
   onNotesChange: (id: string, notes: string) => void;
+  onRatingChange: (id: string, rating: number | null) => void;
+  inputMode: InputMode;
+  onDelete: (id: string) => void;
 }
 
-function SortableAlbumItem({ album, index, onNotesChange }: SortableAlbumItemProps) {
+function SortableAlbumItem({ album, index, onNotesChange, onRatingChange, inputMode, onDelete }: SortableAlbumItemProps) {
   const {
     attributes,
     listeners,
@@ -46,11 +53,40 @@ function SortableAlbumItem({ album, index, onNotesChange }: SortableAlbumItemPro
     transition,
     isDragging
   } = useSortable({ id: album.id });
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 1 : 0,
+  };
+  const showNotes = inputMode === 'review' || inputMode === 'both';
+  const showRating = inputMode === 'rating' || inputMode === 'both';
+  const stars = [1, 2, 3, 4, 5];
+  const formatRating = (rating: number | null) => {
+    if (rating == null) return 'No rating';
+    const display = Number.isInteger(rating) ? rating.toString() : rating.toFixed(1);
+    return `${display}/5`;
+  };
+
+  const resolveRatingFromEvent = (event: React.MouseEvent<HTMLButtonElement>, starValue: number) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const isHalf = clickX <= rect.width / 2;
+    const rawRating = isHalf ? starValue - 0.5 : starValue;
+    return Number(Math.max(0.5, rawRating).toFixed(1));
+  };
+
+  const handleRatingClick = (event: React.MouseEvent<HTMLButtonElement>, starValue: number) => {
+    const nextRating = resolveRatingFromEvent(event, starValue);
+    const isSameRating = album.rating != null && Math.abs(album.rating - nextRating) < 0.001;
+    onRatingChange(album.id, isSameRating ? null : nextRating);
+    setHoverRating(null);
+  };
+
+  const handleRatingHover = (event: React.MouseEvent<HTMLButtonElement>, starValue: number) => {
+    const nextRating = resolveRatingFromEvent(event, starValue);
+    setHoverRating(nextRating);
   };
 
   return (
@@ -84,16 +120,86 @@ function SortableAlbumItem({ album, index, onNotesChange }: SortableAlbumItemPro
           </p>
         </div>
       </div>
-      
-      {/* Non-draggable textarea */}
-      <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 w-1/2">
-        <textarea
-          value={album.notes}
-          onChange={(e) => onNotesChange(album.id, e.target.value)}
-          className="w-full h-48 p-2 border border-gray-600 bg-gray-800 text-white text-lg rounded resize-none"
-          placeholder="Your Review..."
-        />
-      </div>
+      {(showNotes || showRating) && (
+        <div className={`flex flex-col gap-4 flex-shrink-0 ${showNotes ? 'w-1/2' : ''}`}>
+          {showRating && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="rounded border border-gray-600 bg-gray-800 p-3"
+            >
+          <p className="text-sm text-gray-400 mb-2">Rating</p>
+          <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
+            <div className="flex items-center gap-2">
+              {stars.map((star) => {
+                const displayRating = hoverRating ?? album.rating ?? 0;
+                const isFull = displayRating >= star;
+                const isHalf = !isFull && displayRating >= star - 0.5;
+                const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
+                const halfValue = Number((star - 0.5).toFixed(1));
+                const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
+                const title = `Click left half for ${halfValue}, right half for ${star}`;
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={(event) => handleRatingClick(event, star)}
+                    onMouseMove={(event) => handleRatingHover(event, star)}
+                    className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
+                    aria-label={label}
+                    title={title}
+                  >
+                    <span className="pointer-events-none">
+                      {isFull ? (
+                        <Star className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                      ) : isHalf ? (
+                        <StarHalf className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                      ) : (
+                        <Star className="h-8 w-8" strokeWidth={1.5} />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
+          </div>
+            </div>
+          )}
+          {showNotes && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-gray-400">Review</p>
+                <button
+                  type="button"
+                  onClick={() => onDelete(album.id)}
+                  className="text-gray-500 hover:text-red-400 transition-colors"
+                  aria-label={`Remove ${album.name} from the list`}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+              <textarea
+                value={album.notes}
+                onChange={(e) => onNotesChange(album.id, e.target.value)}
+                className="w-full h-48 p-2 border border-gray-600 bg-gray-800 text-white text-lg rounded resize-none"
+                placeholder="Your Review..."
+              />
+            </div>
+          )}
+          {!showNotes && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => onDelete(album.id)}
+                className="text-gray-500 hover:text-red-400 transition-colors"
+                aria-label={`Remove ${album.name} from the list`}
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -104,7 +210,13 @@ interface SpotifyTrack {
   };
 }
 
-export default function PlaylistAnalyzer({ playlistId }: { playlistId: string }) {
+interface PlaylistAnalyzerProps {
+  playlistId: string;
+  inputMode: InputMode;
+  onInputModeChange: (mode: InputMode) => void;
+}
+
+export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeChange }: PlaylistAnalyzerProps) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +252,7 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
               ...album,
               id: `album-${acc.length}`,
               notes: '',
+              rating: null,
             });
           }
           return acc;
@@ -175,6 +288,18 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
     );
   };
 
+  const handleRatingChange = (albumId: string, rating: number | null) => {
+    setAlbums(prevAlbums =>
+      prevAlbums.map(album =>
+        album.id === albumId ? { ...album, rating } : album
+      )
+    );
+  };
+
+  const handleDeleteAlbum = (albumId: string) => {
+    setAlbums(prevAlbums => prevAlbums.filter(album => album.id !== albumId));
+  };
+
   const downloadAsJpeg = async () => {
     if (contentRef.current) {
       const dataUrl = await toJpeg(contentRef.current, {
@@ -207,6 +332,29 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
 
   return (
     <div className="mt-8 bg-gray-900 text-white">
+      <div className="mb-6">
+        <p className="text-sm uppercase tracking-wide text-gray-400 mb-2">Review Mode</p>
+        <div className="flex flex-wrap gap-3">
+          {(['review', 'rating', 'both'] as InputMode[]).map((mode) => (
+            <label
+              key={mode}
+              className={`flex items-center space-x-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                inputMode === mode ? 'border-green-400 bg-gray-800' : 'border-gray-700 bg-gray-900'
+              }`}
+            >
+              <input
+                type="radio"
+                name="input-mode"
+                value={mode}
+                checked={inputMode === mode}
+                onChange={() => onInputModeChange(mode)}
+                className="accent-green-500"
+              />
+              <span className="capitalize">{mode}</span>
+            </label>
+          ))}
+        </div>
+      </div>
       <div ref={contentRef} className="p-4">
         <h2 className="text-2xl font-bold mb-2">{playlistName}</h2>
         <p className="text-gray-400 mb-4">Created by {playlistOwner}</p>
@@ -227,6 +375,9 @@ export default function PlaylistAnalyzer({ playlistId }: { playlistId: string })
                   album={album}
                   index={index}
                   onNotesChange={handleNotesChange}
+                  onRatingChange={handleRatingChange}
+                  inputMode={inputMode}
+                  onDelete={handleDeleteAlbum}
                 />
               ))}
             </div>

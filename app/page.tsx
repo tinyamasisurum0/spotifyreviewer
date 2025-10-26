@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { extractPlaylistIdFromUrl } from '../utils/spotifyApi'
-import PlaylistAnalyzer from '../components/PlaylistAnalyzer'
+import PlaylistAnalyzer, { InputMode } from '../components/PlaylistAnalyzer'
 import { DragDropContext } from 'react-beautiful-dnd'
 
 export default function Home() {
   const [playlistUrl, setPlaylistUrl] = useState('')
   const [playlistId, setPlaylistId] = useState<string | null>(null)
+  const [inputMode, setInputMode] = useState<InputMode>('review')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,7 +40,13 @@ export default function Home() {
             Get Playlist
           </button>
         </form>
-        {playlistId && <PlaylistAnalyzer playlistId={playlistId} />}
+        {playlistId && (
+          <PlaylistAnalyzer
+            playlistId={playlistId}
+            inputMode={inputMode}
+            onInputModeChange={setInputMode}
+          />
+        )}
       </div>
       <div><p className="text-center m-6">Made by <a className='font-extrabold	underline' target='_blank' href="https://x.com/tinyamasisurum0">tinyamasisurum0</a> - Messages on X for feature requests are appreciated.</p></div>
     </DragDropContext>
