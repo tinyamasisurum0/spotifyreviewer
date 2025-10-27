@@ -42,9 +42,18 @@ interface SortableAlbumItemProps {
   onRatingChange: (id: string, rating: number | null) => void;
   inputMode: InputMode;
   onDelete: (id: string) => void;
+  showDeleteButton: boolean;
 }
 
-function SortableAlbumItem({ album, index, onNotesChange, onRatingChange, inputMode, onDelete }: SortableAlbumItemProps) {
+function SortableAlbumItem({
+  album,
+  index,
+  onNotesChange,
+  onRatingChange,
+  inputMode,
+  onDelete,
+  showDeleteButton,
+}: SortableAlbumItemProps) {
   const {
     attributes,
     listeners,
@@ -93,10 +102,20 @@ function SortableAlbumItem({ album, index, onNotesChange, onRatingChange, inputM
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-start space-x-4 p-4 rounded-lg ${
+      className={`relative flex items-start space-x-4 pl-3 pr-4 pt-4 pb-12 rounded-lg ${
         isDragging ? 'bg-gray-600' : index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700'
       }`}
     >
+      {showDeleteButton && (
+        <button
+          type="button"
+          onClick={() => onDelete(album.id)}
+          className="absolute bottom-4 right-4 text-gray-400 hover:text-red-400 transition-colors"
+          aria-label={`Remove ${album.name} from the list`}
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
+      )}
       {/* Draggable area */}
       <p className={`text-lg`}>{index + 1}</p>
       <div
@@ -167,35 +186,13 @@ function SortableAlbumItem({ album, index, onNotesChange, onRatingChange, inputM
           )}
           {showNotes && (
             <div onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-400">Review</p>
-                <button
-                  type="button"
-                  onClick={() => onDelete(album.id)}
-                  className="text-gray-500 hover:text-red-400 transition-colors"
-                  aria-label={`Remove ${album.name} from the list`}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
+              <p className="text-sm text-gray-400 mb-2">Review</p>
               <textarea
                 value={album.notes}
                 onChange={(e) => onNotesChange(album.id, e.target.value)}
                 className="w-full h-48 p-2 border border-gray-600 bg-gray-800 text-white text-lg rounded resize-none"
                 placeholder="Your Review..."
               />
-            </div>
-          )}
-          {!showNotes && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => onDelete(album.id)}
-                className="text-gray-500 hover:text-red-400 transition-colors"
-                aria-label={`Remove ${album.name} from the list`}
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
             </div>
           )}
         </div>
@@ -223,6 +220,7 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
   const contentRef = useRef<HTMLDivElement>(null);
   const [playlistName, setPlaylistName] = useState<string>('');
   const [playlistOwner, setPlaylistOwner] = useState<string>('');
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -301,8 +299,13 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
   };
 
   const downloadAsJpeg = async () => {
-    if (contentRef.current) {
-      const dataUrl = await toJpeg(contentRef.current, {
+    const node = contentRef.current;
+    if (!node) return;
+
+    setIsPreparingDownload(true);
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const dataUrl = await toJpeg(node, {
         backgroundColor: '#1A202C',
         cacheBust: true,
         quality: 0.95,
@@ -311,6 +314,8 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
       link.download = 'playlist-review.jpeg';
       link.href = dataUrl;
       link.click();
+    } finally {
+      setIsPreparingDownload(false);
     }
   };
 
@@ -378,6 +383,7 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
                   onRatingChange={handleRatingChange}
                   inputMode={inputMode}
                   onDelete={handleDeleteAlbum}
+                  showDeleteButton={!isPreparingDownload}
                 />
               ))}
             </div>
