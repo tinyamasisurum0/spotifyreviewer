@@ -146,42 +146,42 @@ function SortableAlbumItem({
               onClick={(e) => e.stopPropagation()}
               className="rounded border border-gray-600 bg-gray-800 p-3"
             >
-          <p className="text-sm text-gray-400 mb-2">Rating</p>
-          <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
-            <div className="flex items-center gap-2">
-              {stars.map((star) => {
-                const displayRating = hoverRating ?? album.rating ?? 0;
-                const isFull = displayRating >= star;
-                const isHalf = !isFull && displayRating >= star - 0.5;
-                const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
-                const halfValue = Number((star - 0.5).toFixed(1));
-                const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
-                const title = `Click left half for ${halfValue}, right half for ${star}`;
-                return (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={(event) => handleRatingClick(event, star)}
-                    onMouseMove={(event) => handleRatingHover(event, star)}
-                    className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
-                    aria-label={label}
-                    title={title}
-                  >
-                    <span className="pointer-events-none">
-                      {isFull ? (
-                        <Star className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
-                      ) : isHalf ? (
-                        <StarHalf className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
-                      ) : (
-                        <Star className="h-8 w-8" strokeWidth={1.5} />
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
-          </div>
+              <p className="text-sm text-gray-400 mb-2">Rating</p>
+              <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
+                <div className="flex items-center gap-2">
+                  {stars.map((star) => {
+                    const displayRating = hoverRating ?? album.rating ?? 0;
+                    const isFull = displayRating >= star;
+                    const isHalf = !isFull && displayRating >= star - 0.5;
+                    const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
+                    const halfValue = Number((star - 0.5).toFixed(1));
+                    const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
+                    const title = `Click left half for ${halfValue}, right half for ${star}`;
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={(event) => handleRatingClick(event, star)}
+                        onMouseMove={(event) => handleRatingHover(event, star)}
+                        className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
+                        aria-label={label}
+                        title={title}
+                      >
+                        <span className="pointer-events-none">
+                          {isFull ? (
+                            <Star className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                          ) : isHalf ? (
+                            <StarHalf className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                          ) : (
+                            <Star className="h-8 w-8" strokeWidth={1.5} />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
+              </div>
             </div>
           )}
           {showNotes && (
