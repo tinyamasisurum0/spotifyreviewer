@@ -24,7 +24,14 @@ export default function Home() {
     <DragDropContext onDragEnd={() => {}}>
       <div className="container mx-auto px-4 py-8 bg-gray-900 text-gray-100 min-h-screen">
         <h1 className="text-3xl font-bold mb-3">Spotify Album Reviewer</h1>
-        <p className="text-sm mb-3">Put at least one song from an album to your playlist, then retrieve with app by pasting its url. <br></br>Put your comments, <strong>change the orders</strong>, download and share. Thanks for using..</p>
+        <div className="text-sm mb-3 space-y-1">
+          <p className="font-semibold text-gray-200">Build your album roundup in minutes:</p>
+          <ol className="list-decimal list-inside text-gray-300 space-y-1">
+            <li>Paste a Spotify playlist link below.</li>
+            <li>See every album ready for ratings and drag-and-drop ordering.</li>
+            <li>Download the lineup as a JPEG and share it with your friends.</li>
+          </ol>
+        </div>
         <form onSubmit={handleSubmit} className="mb-8">
           <input
             type="text"
