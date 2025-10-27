@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Copy } from 'lucide-react'
 import { extractPlaylistIdFromUrl } from '../utils/spotifyApi'
 import PlaylistAnalyzer, { InputMode } from '../components/PlaylistAnalyzer'
 import { DragDropContext } from 'react-beautiful-dnd'
@@ -9,6 +10,17 @@ export default function Home() {
   const [playlistUrl, setPlaylistUrl] = useState('')
   const [playlistId, setPlaylistId] = useState<string | null>(null)
   const [inputMode, setInputMode] = useState<InputMode>('review')
+  const [copiedSampleLink, setCopiedSampleLink] = useState(false)
+  const samplePlaylistUrl = 'https://open.spotify.com/playlist/0xy8aNki7WxsM42dkTOmER'
+  const handleCopySampleLink = async () => {
+    try {
+      await navigator.clipboard.writeText(samplePlaylistUrl)
+      setCopiedSampleLink(true)
+      setTimeout(() => setCopiedSampleLink(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy sample playlist link', error)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,8 +41,27 @@ export default function Home() {
           <ol className="list-decimal list-inside text-gray-300 space-y-1">
             <li>Paste a Spotify playlist link below.</li>
             <li>See every album ready for ratings and drag-and-drop ordering.</li>
-            <li>Download the lineup as a JPEG and share it with your friends.</li>
+            <li>Download the lineup as a JPEG or share it with your friends.</li>
           </ol>
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs">
+            <span className="uppercase tracking-wide text-gray-500">Sample playlist</span>
+            <a
+              href={samplePlaylistUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-gray-300 hover:text-green-300 transition-colors truncate max-w-[220px] sm:max-w-[320px]"
+            >
+              {samplePlaylistUrl}
+            </a>
+            <button
+              type="button"
+              onClick={handleCopySampleLink}
+              className="inline-flex items-center gap-1 rounded border border-gray-700 px-2 py-1 text-gray-200 hover:border-green-400 hover:text-green-300 transition-colors"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>{copiedSampleLink ? 'Copied!' : 'Copy link'}</span>
+            </button>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="mb-8">
           <input
