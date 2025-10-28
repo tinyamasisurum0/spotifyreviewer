@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
-import { Star, StarHalf, Trash2 } from 'lucide-react';
+import { Star, StarHalf, Trash2, Crown, Medal, Award } from 'lucide-react';
 
 
 
@@ -45,6 +45,85 @@ interface SortableAlbumItemProps {
   showDeleteButton: boolean;
 }
 
+interface RankDecoration {
+  containerClass: string;
+  containerStyle?: React.CSSProperties;
+  badge: {
+    label: string;
+    className: string;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    iconClassName: string;
+  };
+  accentBarClass?: string;
+  numberClass?: string;
+  titleClass?: string;
+  artistClass?: string;
+}
+
+const getRankDecoration = (position: number): RankDecoration | null => {
+  switch (position) {
+    case 0:
+      return {
+        containerClass:
+          'bg-gray-900/80 border border-amber-300/60 shadow-[0_22px_45px_-25px_rgba(234,179,8,0.7)] backdrop-blur-sm',
+        containerStyle: {
+          backgroundImage: 'linear-gradient(135deg, rgba(253,224,71,0.42) 0%, rgba(17,24,39,0.94) 58%)',
+        },
+        badge: {
+          label: 'Gold Champion',
+          className:
+            'bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-500 text-gray-900 shadow-lg',
+          icon: Crown,
+          iconClassName: 'text-amber-600',
+        },
+        accentBarClass: 'bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500',
+        numberClass: 'text-amber-300 drop-shadow-[0_0_10px_rgba(250,204,21,0.85)]',
+        titleClass: 'text-amber-100',
+        artistClass: 'text-yellow-200/80',
+      };
+    case 1:
+      return {
+        containerClass:
+          'bg-slate-900/80 border border-slate-300/40 shadow-[0_20px_40px_-28px_rgba(148,163,184,0.6)] backdrop-blur-[2px]',
+        containerStyle: {
+          backgroundImage: 'linear-gradient(135deg, rgba(203,213,225,0.32) 0%, rgba(15,23,42,0.94) 62%)',
+        },
+        badge: {
+          label: 'Silver Runner-Up',
+          className:
+            'bg-gradient-to-r from-slate-100 via-slate-300 to-gray-400 text-gray-900 shadow-md',
+          icon: Medal,
+          iconClassName: 'text-slate-500',
+        },
+        accentBarClass: 'bg-gradient-to-r from-slate-200 via-slate-400 to-gray-500',
+        numberClass: 'text-slate-200',
+        titleClass: 'text-slate-100',
+        artistClass: 'text-slate-300',
+      };
+    case 2:
+      return {
+        containerClass:
+          'bg-stone-900/80 border border-orange-400/40 shadow-[0_18px_35px_-26px_rgba(234,88,12,0.6)] backdrop-blur-[1px]',
+        containerStyle: {
+          backgroundImage: 'linear-gradient(135deg, rgba(248,180,107,0.26) 0%, rgba(15,23,42,0.95) 66%)',
+        },
+        badge: {
+          label: 'Bronze Third',
+          className:
+            'bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600 text-gray-900 shadow',
+          icon: Award,
+          iconClassName: 'text-orange-700',
+        },
+        accentBarClass: 'bg-gradient-to-r from-orange-300 via-amber-500 to-orange-600',
+        numberClass: 'text-orange-200',
+        titleClass: 'text-orange-100',
+        artistClass: 'text-orange-200/80',
+      };
+    default:
+      return null;
+  }
+};
+
 function SortableAlbumItem({
   album,
   index,
@@ -64,11 +143,29 @@ function SortableAlbumItem({
   } = useSortable({ id: album.id });
   const [hoverRating, setHoverRating] = useState<number | null>(null);
 
-  const style = {
+  const rankDecoration = getRankDecoration(index);
+  const badge = rankDecoration?.badge;
+  const BadgeIcon = badge?.icon;
+  const baseStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 1 : 0,
   };
+  const combinedStyle = rankDecoration?.containerStyle
+    ? { ...baseStyle, ...rankDecoration.containerStyle }
+    : baseStyle;
+  const baseBackgroundClass = isDragging
+    ? 'bg-gray-600'
+    : index % 2 === 0
+      ? 'bg-gray-800'
+      : 'bg-gray-700';
+  const cardClassName = `relative rounded-lg ${
+    rankDecoration ? `overflow-hidden ${rankDecoration.containerClass}` : baseBackgroundClass
+  }`;
+  const rankNumberClass = rankDecoration?.numberClass ?? 'text-gray-300';
+  const titleClassName = `text-lg font-semibold ${rankDecoration?.titleClass ?? ''}`.trim();
+  const artistClassName = `${rankDecoration?.artistClass ?? 'text-gray-400'}`.trim();
+
   const showNotes = inputMode === 'review' || inputMode === 'both';
   const showRating = inputMode === 'rating' || inputMode === 'both';
   const stars = [1, 2, 3, 4, 5];
@@ -101,101 +198,114 @@ function SortableAlbumItem({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`relative flex flex-col gap-4 rounded-lg p-4 pb-12 lg:flex-row lg:items-start lg:gap-6 ${
-        isDragging ? 'bg-gray-600' : index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700'
-      }`}
+      style={combinedStyle}
+      className={cardClassName}
     >
+      {badge && (
+        <div
+          className={`pointer-events-none absolute bottom-0 left-0 flex items-center gap-2 px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badge.className}`}
+        >
+          {BadgeIcon && (
+            <BadgeIcon className={`h-4 w-4 ${badge.iconClassName}`} />
+          )}
+          <span>{badge.label}</span>
+        </div>
+      )}
+      <div className="relative z-10 flex flex-col gap-4 p-4 pb-12 lg:flex-row lg:items-start lg:gap-6">
+        {/* Draggable area */}
+        <p className={`self-start text-lg font-semibold lg:mt-1 ${rankNumberClass}`}>{index + 1}</p>
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex w-full flex-col gap-4 cursor-move sm:flex-row sm:items-start sm:gap-4"
+        >
+          <div className="relative mx-auto aspect-square w-full max-w-xs flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/5 sm:mx-0 sm:w-48 sm:max-w-none lg:w-64">
+            <Image
+              src={album.images[0]?.url || '/placeholder.svg'}
+              alt={album.name}
+              fill
+              className="rounded-lg object-cover"
+            />
+          </div>
+          <div className="flex-1">
+            <h3 className={titleClassName}>{album.name}</h3>
+            <p className={artistClassName}>{album.artists[0].name}</p>
+            <p className="text-sm text-gray-500">
+              Release Date: {new Date(album.release_date).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+        {(showNotes || showRating) && (
+          <div className={`flex w-full flex-col gap-4 ${showNotes ? 'lg:w-1/2' : 'lg:w-auto'}`}>
+            {showRating && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="rounded border border-gray-600 bg-gray-800 p-3"
+              >
+                <p className="text-sm text-gray-400 mb-2">Rating</p>
+                <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
+                  <div className="flex items-center gap-2">
+                    {stars.map((star) => {
+                      const displayRating = hoverRating ?? album.rating ?? 0;
+                      const isFull = displayRating >= star;
+                      const isHalf = !isFull && displayRating >= star - 0.5;
+                      const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
+                      const halfValue = Number((star - 0.5).toFixed(1));
+                      const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
+                      const title = `Click left half for ${halfValue}, right half for ${star}`;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={(event) => handleRatingClick(event, star)}
+                          onMouseMove={(event) => handleRatingHover(event, star)}
+                          className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
+                          aria-label={label}
+                          title={title}
+                        >
+                          <span className="pointer-events-none">
+                            {isFull ? (
+                              <Star className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                            ) : isHalf ? (
+                              <StarHalf className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
+                            ) : (
+                              <Star className="h-8 w-8" strokeWidth={1.5} />
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
+                </div>
+              </div>
+            )}
+            {showNotes && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <p className="text-sm text-gray-400 mb-2">Review</p>
+                <textarea
+                  value={album.notes}
+                  onChange={(e) => onNotesChange(album.id, e.target.value)}
+                  className="w-full h-48 rounded border border-gray-600 bg-gray-800 p-2 text-base text-white resize-none sm:text-lg"
+                  placeholder="Your Review..."
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       {showDeleteButton && (
         <button
           type="button"
           onClick={() => onDelete(album.id)}
-          className="absolute bottom-4 right-4 text-gray-400 hover:text-red-400 transition-colors"
+          className="absolute bottom-4 right-4 z-20 text-gray-400 transition-colors hover:text-red-400"
           aria-label={`Remove ${album.name} from the list`}
         >
           <Trash2 className="h-5 w-5" />
         </button>
       )}
-      {/* Draggable area */}
-      <p className="self-start text-lg font-semibold text-gray-300 lg:mt-1">{index + 1}</p>
-      <div
-        {...attributes}
-        {...listeners}
-        className="flex w-full flex-col gap-4 cursor-move sm:flex-row sm:items-start sm:gap-4"
-      >
-        <div className="relative mx-auto aspect-square w-full max-w-xs flex-shrink-0 overflow-hidden rounded-lg sm:mx-0 sm:w-48 sm:max-w-none lg:w-64">
-          <Image
-            src={album.images[0]?.url || '/placeholder.svg'}
-            alt={album.name}
-            fill
-            className="rounded-lg object-cover"
-          />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold">{album.name}</h3>
-          <p className="text-gray-400">{album.artists[0].name}</p>
-          <p className="text-sm text-gray-500">
-            Release Date: {new Date(album.release_date).toLocaleDateString()}
-          </p>
-        </div>
-      </div>
-      {(showNotes || showRating) && (
-        <div className={`flex w-full flex-col gap-4 ${showNotes ? 'lg:w-1/2' : 'lg:w-auto'}`}>
-          {showRating && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="rounded border border-gray-600 bg-gray-800 p-3"
-            >
-              <p className="text-sm text-gray-400 mb-2">Rating</p>
-              <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
-                <div className="flex items-center gap-2">
-                  {stars.map((star) => {
-                    const displayRating = hoverRating ?? album.rating ?? 0;
-                    const isFull = displayRating >= star;
-                    const isHalf = !isFull && displayRating >= star - 0.5;
-                    const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
-                    const halfValue = Number((star - 0.5).toFixed(1));
-                    const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
-                    const title = `Click left half for ${halfValue}, right half for ${star}`;
-                    return (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={(event) => handleRatingClick(event, star)}
-                        onMouseMove={(event) => handleRatingHover(event, star)}
-                        className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
-                        aria-label={label}
-                        title={title}
-                      >
-                        <span className="pointer-events-none">
-                          {isFull ? (
-                            <Star className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
-                          ) : isHalf ? (
-                            <StarHalf className="h-8 w-8" strokeWidth={1.5} fill="currentColor" />
-                          ) : (
-                            <Star className="h-8 w-8" strokeWidth={1.5} />
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
-              </div>
-            </div>
-          )}
-          {showNotes && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <p className="text-sm text-gray-400 mb-2">Review</p>
-              <textarea
-                value={album.notes}
-                onChange={(e) => onNotesChange(album.id, e.target.value)}
-                className="w-full h-48 rounded border border-gray-600 bg-gray-800 p-2 text-base text-white resize-none sm:text-lg"
-                placeholder="Your Review..."
-              />
-            </div>
-          )}
-        </div>
+      {rankDecoration?.accentBarClass && (
+        <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-1 ${rankDecoration.accentBarClass}`} />
       )}
     </div>
   );
