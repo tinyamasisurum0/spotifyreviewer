@@ -34,7 +34,7 @@ export default function Home() {
 
   return (
     <DragDropContext onDragEnd={() => {}}>
-      <div className="container mx-auto px-4 py-8 bg-gray-900 text-gray-100 min-h-screen">
+      <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-8 text-gray-100 sm:px-6 lg:px-10">
         <h1 className="text-3xl font-bold mb-3">Spotify Album Reviewer</h1>
         <div className="text-sm mb-3 space-y-1">
           <p className="font-semibold text-gray-200">Build your album roundup in minutes:</p>

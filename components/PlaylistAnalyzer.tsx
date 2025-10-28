@@ -102,7 +102,7 @@ function SortableAlbumItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative flex items-start space-x-4 pl-3 pr-4 pt-4 pb-12 rounded-lg ${
+      className={`relative flex flex-col gap-4 rounded-lg p-4 pb-12 lg:flex-row lg:items-start lg:gap-6 ${
         isDragging ? 'bg-gray-600' : index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700'
       }`}
     >
@@ -117,13 +117,13 @@ function SortableAlbumItem({
         </button>
       )}
       {/* Draggable area */}
-      <p className={`text-lg`}>{index + 1}</p>
+      <p className="self-start text-lg font-semibold text-gray-300 lg:mt-1">{index + 1}</p>
       <div
         {...attributes}
         {...listeners}
-        className="flex items-start space-x-4 flex-grow cursor-move"
+        className="flex w-full flex-col gap-4 cursor-move sm:flex-row sm:items-start sm:gap-4"
       >
-        <div className="w-64 h-64 relative flex-shrink-0">
+        <div className="relative mx-auto aspect-square w-full max-w-xs flex-shrink-0 overflow-hidden rounded-lg sm:mx-0 sm:w-48 sm:max-w-none lg:w-64">
           <Image
             src={album.images[0]?.url || '/placeholder.svg'}
             alt={album.name}
@@ -131,8 +131,8 @@ function SortableAlbumItem({
             className="rounded-lg object-cover"
           />
         </div>
-        <div className="flex-grow">
-          <h3 className="font-semibold text-lg">{album.name}</h3>
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold">{album.name}</h3>
           <p className="text-gray-400">{album.artists[0].name}</p>
           <p className="text-sm text-gray-500">
             Release Date: {new Date(album.release_date).toLocaleDateString()}
@@ -140,7 +140,7 @@ function SortableAlbumItem({
         </div>
       </div>
       {(showNotes || showRating) && (
-        <div className={`flex flex-col gap-4 flex-shrink-0 ${showNotes ? 'w-1/2' : ''}`}>
+        <div className={`flex w-full flex-col gap-4 ${showNotes ? 'lg:w-1/2' : 'lg:w-auto'}`}>
           {showRating && (
             <div
               onClick={(e) => e.stopPropagation()}
@@ -190,7 +190,7 @@ function SortableAlbumItem({
               <textarea
                 value={album.notes}
                 onChange={(e) => onNotesChange(album.id, e.target.value)}
-                className="w-full h-48 p-2 border border-gray-600 bg-gray-800 text-white text-lg rounded resize-none"
+                className="w-full h-48 rounded border border-gray-600 bg-gray-800 p-2 text-base text-white resize-none sm:text-lg"
                 placeholder="Your Review..."
               />
             </div>
@@ -221,6 +221,8 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
   const [playlistName, setPlaylistName] = useState<string>('');
   const [playlistOwner, setPlaylistOwner] = useState<string>('');
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -298,7 +300,7 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
     setAlbums(prevAlbums => prevAlbums.filter(album => album.id !== albumId));
   };
 
-  const downloadAsJpeg = async () => {
+  const generateImage = async () => {
     const node = contentRef.current;
     if (!node) return;
 
@@ -310,13 +312,30 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
         cacheBust: true,
         quality: 0.95,
       });
-      const link = document.createElement('a');
-      link.download = 'playlist-review.jpeg';
-      link.href = dataUrl;
-      link.click();
+      setGeneratedImageUrl(dataUrl);
+      setShowDownloadModal(true);
+    } catch (error) {
+      console.error('Failed to generate image', error);
     } finally {
       setIsPreparingDownload(false);
     }
+  };
+
+  const handleDownloadJpeg = () => {
+    if (!generatedImageUrl) return;
+
+    const link = document.createElement('a');
+    link.download = 'playlist-review.jpeg';
+    link.href = generatedImageUrl;
+    link.click();
+  };
+
+  const handleCloseModal = () => {
+    setShowDownloadModal(false);
+  };
+
+  const handleGenerateClick = async () => {
+    await generateImage();
   };
 
   if (loading) {
@@ -360,7 +379,7 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
           ))}
         </div>
       </div>
-      <div ref={contentRef} className="p-4">
+      <div ref={contentRef} className="p-3 sm:p-4 lg:p-6">
         <h2 className="text-2xl font-bold mb-2">{playlistName}</h2>
         <p className="text-gray-400 mb-4">Created by {playlistOwner}</p>
         <DndContext
@@ -390,12 +409,46 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
           </SortableContext>
         </DndContext>
       </div>
-      <button
-        onClick={downloadAsJpeg}
-        className="m-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-      >
-        Download as JPEG
-      </button>
+      <div className="mt-6 flex w-full justify-center">
+        <button
+          onClick={handleGenerateClick}
+          disabled={isPreparingDownload}
+          className="w-full px-6 py-3 text-lg font-semibold text-center rounded-lg bg-blue-500 text-white shadow-lg transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-400 disabled:opacity-80 sm:w-auto sm:px-8"
+        >
+          Generate Image
+        </button>
+      </div>
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md space-y-6 rounded-lg border border-gray-700 bg-gray-900 p-6 shadow-xl">
+            <div className="space-y-1">
+              <h3 className="text-xl font-semibold text-white">Your image is ready</h3>
+              <p className="text-sm text-gray-400">
+                Download the generated JPEG whenever you&apos;re ready.
+              </p>
+            </div>
+            <div className="flex h-32 w-full items-center justify-center rounded-lg border border-dashed border-gray-600 bg-gray-800 text-sm uppercase tracking-wide text-gray-500">
+              Advertisement Placeholder
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-400 hover:text-white"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadJpeg}
+                className="rounded bg-green-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+              >
+                Download JPEG
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
