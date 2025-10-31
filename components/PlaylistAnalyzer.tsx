@@ -25,14 +25,19 @@ import { Star, StarHalf, Trash2, Crown, Medal, Award } from 'lucide-react';
 
 export type InputMode = 'review' | 'rating' | 'both';
 
-interface Album {
+interface SpotifyAlbum {
   id: string;
   name: string;
   images: { url: string }[];
   artists: { name: string }[];
   release_date: string;
+  external_urls?: { spotify?: string };
+}
+
+interface Album extends SpotifyAlbum {
   notes: string;
   rating: number | null;
+  spotifyUrl: string | null;
 }
 
 interface SortableAlbumItemProps {
@@ -313,7 +318,7 @@ function SortableAlbumItem({
 
 interface SpotifyTrack {
   track: {
-    album: Album;
+    album: SpotifyAlbum;
   };
 }
 
@@ -330,9 +335,13 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
   const contentRef = useRef<HTMLDivElement>(null);
   const [playlistName, setPlaylistName] = useState<string>('');
   const [playlistOwner, setPlaylistOwner] = useState<string>('');
+  const [playlistImage, setPlaylistImage] = useState<string | null>(null);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -350,19 +359,24 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
       try {
         setLoading(true);
         setError(null);
+        setPlaylistImage(null);
         const tracks = await getPlaylistTracks(playlistId);
-        const { name, owner } = await getPlaylistDetails(playlistId); 
+        const { name, owner, image } = await getPlaylistDetails(playlistId); 
         setPlaylistName(name);
         setPlaylistOwner(owner);
+        setPlaylistImage(image ?? null);
 
         const uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
-          const album = item.track.album;
-          if (!acc.find((a) => a.name === album.name)) {
+          const spotifyAlbum = item.track.album;
+          const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
+          const alreadyExists = acc.some((existing) => existing.id === albumId);
+          if (!alreadyExists) {
             acc.push({
-              ...album,
-              id: `album-${acc.length}`,
+              ...spotifyAlbum,
+              id: albumId,
               notes: '',
               rating: null,
+              spotifyUrl: spotifyAlbum.external_urls?.spotify ?? null,
             });
           }
           return acc;
@@ -423,6 +437,8 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
         quality: 0.95,
       });
       setGeneratedImageUrl(dataUrl);
+      setSaveError(null);
+      setSaveSuccess(false);
       setShowDownloadModal(true);
     } catch (error) {
       console.error('Failed to generate image', error);
@@ -442,10 +458,64 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
 
   const handleCloseModal = () => {
     setShowDownloadModal(false);
+    setSaveError(null);
+    setSaveSuccess(false);
   };
 
   const handleGenerateClick = async () => {
     await generateImage();
+  };
+
+  const handleSaveReview = async () => {
+    if (isSavingReview || saveSuccess) {
+      return;
+    }
+    if (!generatedImageUrl) {
+      setSaveError('Generate the image before saving your review.');
+      return;
+    }
+
+    setIsSavingReview(true);
+    setSaveError(null);
+
+    const serializedAlbums = albums.map((album) => ({
+      id: album.id,
+      name: album.name,
+      artist: album.artists?.[0]?.name ?? '',
+      image: album.images?.[0]?.url ?? null,
+      releaseDate: album.release_date,
+      notes: album.notes,
+      rating: album.rating,
+      spotifyUrl: album.spotifyUrl,
+    }));
+
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlistId,
+          playlistName,
+          playlistOwner,
+          playlistImage,
+          albums: serializedAlbums,
+          imageDataUrl: generatedImageUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save review.');
+      }
+
+      setSaveSuccess(true);
+    } catch (error) {
+      console.error('Failed to save review', error);
+      setSaveError('Failed to save review. Please try again.');
+    } finally {
+      setIsSavingReview(false);
+    }
   };
 
   if (loading) {
@@ -490,8 +560,21 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
         </div>
       </div>
       <div ref={contentRef} className="p-3 sm:p-4 lg:p-6">
-        <h2 className="text-2xl font-bold mb-2">{playlistName}</h2>
-        <p className="text-gray-400 mb-4">Created by {playlistOwner}</p>
+        <div className="mb-4 flex items-center gap-4">
+          {playlistImage && (
+            <Image
+              src={playlistImage}
+              alt={`Cover art for ${playlistName}`}
+              width={96}
+              height={96}
+              className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/10 sm:h-20 sm:w-20"
+            />
+          )}
+          <div>
+            <h2 className="text-2xl font-bold">{playlistName}</h2>
+            <p className="text-gray-400">Created by {playlistOwner || 'Unknown creator'}</p>
+          </div>
+        </div>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -540,13 +623,35 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
             <div className="flex h-32 w-full items-center justify-center rounded-lg border border-dashed border-gray-600 bg-gray-800 text-sm uppercase tracking-wide text-gray-500">
               Advertisement Placeholder
             </div>
-            <div className="flex justify-end gap-2">
+            {saveSuccess && (
+              <div className="rounded border border-green-500 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+                Review saved. Visit the{' '}
+                <a href="/reviews" className="font-semibold text-green-300 underline underline-offset-2">
+                  Review Listing
+                </a>{' '}
+                to share it.
+              </div>
+            )}
+            {saveError && (
+              <div className="rounded border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {saveError}
+              </div>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={handleCloseModal}
                 className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-400 hover:text-white"
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveReview}
+                disabled={isSavingReview || saveSuccess || albums.length === 0}
+                className="rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-80"
+              >
+                {saveSuccess ? 'Saved' : isSavingReview ? 'Saving…' : 'Save & Share'}
               </button>
               <button
                 type="button"

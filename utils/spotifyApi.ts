@@ -43,7 +43,7 @@ export async function getPlaylistTracks(playlistId: string) {
         'Authorization': `Bearer ${token}`,
       },
       params: {
-        fields: 'items(track(name,artists,album(name,images,release_date,label,artists,type)))',
+        fields: 'items(track(name,artists,album(id,name,images,release_date,label,artists,type,external_urls)))',
         limit: 100
       }
     });
@@ -65,6 +65,9 @@ export async function getPlaylistDetails(playlistId: string) {
     return {
       name: response.data.name,
       owner: response.data.owner.display_name,
+      image: Array.isArray(response.data.images) && response.data.images.length > 0
+        ? response.data.images[0].url
+        : null,
     };
   } catch (error) {
     console.error('Error fetching playlist details:', error);
@@ -77,4 +80,3 @@ export function extractPlaylistIdFromUrl(url: string): string | null {
   const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
   return match ? match[1] : null;
 }
-
