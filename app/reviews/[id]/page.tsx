@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Star, StarHalf, ExternalLink } from 'lucide-react';
+import ReviewImagePreview from '@/components/ReviewImagePreview';
 import { getReviewById } from '@/lib/reviews';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-4xl bg-gray-900 px-4 py-10 text-gray-100 sm:px-6 lg:px-10">
+    <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-10 text-gray-100 sm:px-6 lg:px-10">
       <header className="mb-10 space-y-4">
         <div className="flex flex-wrap items-start gap-4">
           {review.playlistImage && (
@@ -57,14 +58,10 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
       </header>
 
       {review.imageDataUrl && (
-        <section className="mb-10 overflow-hidden rounded-lg border border-gray-800 bg-gray-950/50">
-          <Image
-            src={review.imageDataUrl}
-            alt={`Generated review for ${review.playlistName}`}
-            width={1600}
-            height={1600}
-            unoptimized
-            className="h-auto w-full object-cover"
+        <section className="mb-10">
+          <ReviewImagePreview
+            imageDataUrl={review.imageDataUrl}
+            playlistName={review.playlistName}
           />
         </section>
       )}

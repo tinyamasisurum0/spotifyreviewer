@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const { playlistId, playlistName, playlistOwner, imageDataUrl, playlistImage } = payload ?? {};
-    const albumsInput = Array.isArray(payload?.albums) ? payload.albums : [];
+    const albumsInput: unknown[] = Array.isArray(payload?.albums) ? payload.albums : [];
 
     if (
       typeof playlistId !== 'string' ||
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const albums: StoredAlbum[] = albumsInput
-      .map((albumEntry) => {
+      .map((albumEntry: unknown) => {
         if (typeof albumEntry !== 'object' || albumEntry === null) {
           return null;
         }
