@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import type { ReviewInput, StoredAlbum, StoredReview } from '@/types/review';
+import type { ReviewInput, StoredReview } from '@/types/review';
 
 const REVIEWS_FILE = path.join(process.cwd(), 'data', 'reviews.json');
 
