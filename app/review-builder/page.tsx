@@ -1,17 +1,89 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Copy } from 'lucide-react'
 import { extractPlaylistIdFromUrl } from '@/utils/spotifyApi'
 import PlaylistAnalyzer, { InputMode } from '@/components/PlaylistAnalyzer'
 import { DragDropContext } from 'react-beautiful-dnd'
+import type { StoredReview } from '@/types/review'
 
 export default function ReviewBuilderPage() {
-  const [playlistUrl, setPlaylistUrl] = useState('')
-  const [playlistId, setPlaylistId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const initialPlaylistId = searchParams.get('playlistId')
+  const reviewId = searchParams.get('reviewId')
+  const [playlistUrl, setPlaylistUrl] = useState(() =>
+    initialPlaylistId ? `https://open.spotify.com/playlist/${initialPlaylistId}` : ''
+  )
+  const [playlistId, setPlaylistId] = useState<string | null>(initialPlaylistId)
   const [inputMode, setInputMode] = useState<InputMode>('review')
   const [copiedSampleLink, setCopiedSampleLink] = useState(false)
+  const [preloadedReview, setPreloadedReview] = useState<StoredReview | null>(null)
+  const [loadingReview, setLoadingReview] = useState(false)
+  const [preloadError, setPreloadError] = useState<string | null>(null)
   const samplePlaylistUrl = 'https://open.spotify.com/playlist/0xy8aNki7WxsM42dkTOmER'
+  const preloadedInitialData = useMemo(
+    () =>
+      preloadedReview
+        ? {
+            playlistId: preloadedReview.playlistId,
+            playlistName: preloadedReview.playlistName,
+            playlistOwner: preloadedReview.playlistOwner,
+            playlistImage: preloadedReview.playlistImage,
+            albums: preloadedReview.albums,
+          }
+        : undefined,
+    [preloadedReview]
+  )
+
+  useEffect(() => {
+    if (initialPlaylistId) {
+      setPlaylistId(initialPlaylistId)
+      setPlaylistUrl(`https://open.spotify.com/playlist/${initialPlaylistId}`)
+    }
+  }, [initialPlaylistId])
+
+  useEffect(() => {
+    if (!reviewId) {
+      setPreloadedReview(null)
+      setPreloadError(null)
+      setLoadingReview(false)
+      return
+    }
+
+    let isCancelled = false
+
+    const fetchReview = async () => {
+      setLoadingReview(true)
+      setPreloadError(null)
+      try {
+        const response = await fetch(`/api/reviews/${reviewId}`)
+        if (!response.ok) {
+          throw new Error('Review not found or no longer available.')
+        }
+        const data: StoredReview = await response.json()
+        if (isCancelled) return
+        setPreloadedReview(data)
+        setPlaylistId(data.playlistId)
+        setPlaylistUrl(`https://open.spotify.com/playlist/${data.playlistId}`)
+      } catch (error) {
+        if (isCancelled) return
+        console.error('Failed to load saved review', error)
+        setPreloadedReview(null)
+        setPreloadError('Unable to load the saved review. It may have been removed.')
+      } finally {
+        if (!isCancelled) {
+          setLoadingReview(false)
+        }
+      }
+    }
+
+    fetchReview()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [reviewId])
 
   const handleCopySampleLink = async () => {
     try {
@@ -27,6 +99,8 @@ export default function ReviewBuilderPage() {
     e.preventDefault()
     const id = extractPlaylistIdFromUrl(playlistUrl)
     if (id) {
+      setPreloadedReview(null)
+      setPreloadError(null)
       setPlaylistId(id)
     } else {
       alert('Geçersiz Spotify playlist URL\'si. Lütfen kontrol edip tekrar deneyin.')
@@ -81,11 +155,22 @@ export default function ReviewBuilderPage() {
             Get Playlist
           </button>
         </form>
+        {loadingReview && !preloadError && (
+          <div className="mb-6 rounded border border-gray-700 bg-gray-900/70 px-4 py-3 text-sm text-gray-300">
+            Loading saved review…
+          </div>
+        )}
+        {preloadError && (
+          <div className="mb-6 rounded border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {preloadError}
+          </div>
+        )}
         {playlistId && (
           <PlaylistAnalyzer
             playlistId={playlistId}
             inputMode={inputMode}
             onInputModeChange={setInputMode}
+            initialData={preloadedInitialData}
           />
         )}
       </div>

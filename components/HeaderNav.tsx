@@ -8,7 +8,6 @@ import { Menu, X } from 'lucide-react';
 const navLinks = [
   { href: '/', label: 'Reviews' },
   { href: '/review-builder', label: 'Start Your Review' },
-  { href: '/admin', label: 'Admin' },
 ];
 
 export function HeaderNav() {

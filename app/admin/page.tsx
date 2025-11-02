@@ -3,6 +3,16 @@ import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
 import DeleteReviewButton from './_components/DeleteReviewButton';
 
+const ADMIN_USERNAME = process.env.NEXT_PUBLIC_ADMIN_USERNAME ?? 'playlist-admin';
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? 'changeme-now';
+
+type AdminPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+const getParamValue = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value ?? '';
+
 export const dynamic = 'force-dynamic';
 
 const formatDate = (iso: string) => {
@@ -16,7 +26,25 @@ const formatDate = (iso: string) => {
   }
 };
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const userParam = getParamValue(searchParams?.user);
+  const passParam = getParamValue(searchParams?.pass);
+  const isAuthorized = userParam === ADMIN_USERNAME && passParam === ADMIN_PASSWORD;
+
+  if (!isAuthorized) {
+    return (
+      <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-10 text-gray-100 sm:px-6 lg:px-10">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-8">
+          <h1 className="text-2xl font-semibold text-red-200">Restricted Area</h1>
+          <p className="mt-2 text-sm text-red-100/80">
+            Valid credentials are required to access the admin dashboard. Confirm you have the
+            correct admin URL with username and password and try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const reviews = await readReviews();
   const sorted = [...reviews].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

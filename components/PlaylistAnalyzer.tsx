@@ -20,6 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
 import { Star, StarHalf, Trash2, Crown, Medal, Award } from 'lucide-react';
+import type { StoredAlbum } from '@/types/review';
 
 
 
@@ -49,6 +50,26 @@ interface SortableAlbumItemProps {
   onDelete: (id: string) => void;
   showDeleteButton: boolean;
 }
+
+interface InitialReviewData {
+  playlistId: string;
+  playlistName: string;
+  playlistOwner: string;
+  playlistImage: string | null;
+  albums: StoredAlbum[];
+}
+
+const mapStoredAlbumToAlbum = (stored: StoredAlbum): Album => ({
+  id: stored.id,
+  name: stored.name,
+  release_date: stored.releaseDate,
+  images: stored.image ? [{ url: stored.image }] : [],
+  artists: [{ name: stored.artist || 'Unknown Artist' }],
+  notes: stored.notes ?? '',
+  rating: stored.rating ?? null,
+  spotifyUrl: stored.spotifyUrl ?? null,
+  external_urls: stored.spotifyUrl ? { spotify: stored.spotifyUrl } : undefined,
+});
 
 interface RankDecoration {
   containerClass: string;
@@ -326,16 +347,24 @@ interface PlaylistAnalyzerProps {
   playlistId: string;
   inputMode: InputMode;
   onInputModeChange: (mode: InputMode) => void;
+  initialData?: InitialReviewData;
 }
 
-export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeChange }: PlaylistAnalyzerProps) {
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function PlaylistAnalyzer({
+  playlistId,
+  inputMode,
+  onInputModeChange,
+  initialData,
+}: PlaylistAnalyzerProps) {
+  const [albums, setAlbums] = useState<Album[]>(() =>
+    initialData ? initialData.albums.map(mapStoredAlbumToAlbum) : []
+  );
+  const [loading, setLoading] = useState(() => !initialData);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [playlistName, setPlaylistName] = useState<string>('');
-  const [playlistOwner, setPlaylistOwner] = useState<string>('');
-  const [playlistImage, setPlaylistImage] = useState<string | null>(null);
+  const [playlistName, setPlaylistName] = useState<string>(initialData?.playlistName ?? '');
+  const [playlistOwner, setPlaylistOwner] = useState<string>(initialData?.playlistOwner ?? '');
+  const [playlistImage, setPlaylistImage] = useState<string | null>(initialData?.playlistImage ?? null);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -355,13 +384,52 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
   );
 
   useEffect(() => {
+    if (!initialData) {
+      return;
+    }
+    setAlbums(initialData.albums.map(mapStoredAlbumToAlbum));
+    setPlaylistName(initialData.playlistName);
+    setPlaylistOwner(initialData.playlistOwner);
+    setPlaylistImage(initialData.playlistImage ?? null);
+    setLoading(false);
+    setError(null);
+    setGeneratedImageUrl(null);
+    setShowDownloadModal(false);
+    setSaveSuccess(false);
+    setSaveError(null);
+    setIsSavingReview(false);
+    setIsPreparingDownload(false);
+  }, [initialData]);
+
+  useEffect(() => {
+    if (!playlistId) {
+      return;
+    }
+    if (initialData && initialData.playlistId === playlistId) {
+      return;
+    }
+
+    let isCancelled = false;
+
     async function fetchPlaylistData() {
       try {
         setLoading(true);
         setError(null);
         setPlaylistImage(null);
+        setGeneratedImageUrl(null);
+        setShowDownloadModal(false);
+        setSaveSuccess(false);
+        setSaveError(null);
+        setIsSavingReview(false);
+        setIsPreparingDownload(false);
+
         const tracks = await getPlaylistTracks(playlistId);
-        const { name, owner, image } = await getPlaylistDetails(playlistId); 
+        const { name, owner, image } = await getPlaylistDetails(playlistId);
+
+        if (isCancelled) {
+          return;
+        }
+
         setPlaylistName(name);
         setPlaylistOwner(owner);
         setPlaylistImage(image ?? null);
@@ -383,14 +451,22 @@ export default function PlaylistAnalyzer({ playlistId, inputMode, onInputModeCha
         }, []);
         setAlbums(uniqueAlbums);
       } catch {
-        setError('Wrong playlist URL. Please ensure to paste a playlist URL');
+        if (!isCancelled) {
+          setError('Wrong playlist URL. Please ensure to paste a playlist URL');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchPlaylistData();
-  }, [playlistId]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [playlistId, initialData]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;

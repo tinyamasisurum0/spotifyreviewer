@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Star, StarHalf, ExternalLink } from 'lucide-react';
 import ReviewImagePreview from '@/components/ReviewImagePreview';
@@ -55,6 +56,18 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
             </p>
           </div>
         </div>
+        {review.playlistId && (
+          <div>
+            <Link
+              href={`/review-builder?reviewId=${encodeURIComponent(review.id)}${
+                review.playlistId ? `&playlistId=${encodeURIComponent(review.playlistId)}` : ''
+              }`}
+              className="inline-flex items-center gap-2 rounded-md bg-green-500 px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-green-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-200"
+            >
+              Start a Review From This
+            </Link>
+          </div>
+        )}
       </header>
 
       {review.imageDataUrl && (

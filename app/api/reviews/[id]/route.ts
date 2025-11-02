@@ -1,30 +1,20 @@
 import { NextResponse } from 'next/server';
-import { deleteReviewById, getReviewById } from '@/lib/reviews';
+import { getReviewById } from '@/lib/reviews';
 
-export const dynamic = 'force-dynamic';
-
-type RouteContext = {
+type ReviewParams = {
   params: {
     id: string;
   };
 };
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
-  const { id } = params;
-  if (!id) {
-    return NextResponse.json({ message: 'Missing review id.' }, { status: 400 });
-  }
-  const deleted = await deleteReviewById(id);
-  if (!deleted) {
-    return NextResponse.json({ message: 'Review not found.' }, { status: 404 });
-  }
-  return NextResponse.json({ message: 'Review deleted.' }, { status: 200 });
-}
+export const dynamic = 'force-dynamic';
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(_request: Request, { params }: ReviewParams) {
   const review = await getReviewById(params.id);
+
   if (!review) {
     return NextResponse.json({ message: 'Review not found.' }, { status: 404 });
   }
+
   return NextResponse.json(review);
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { addReview, readReviews, StoredAlbum } from '@/lib/reviews';
+import { addReview, readReviews } from '@/lib/reviews';
+import type { StoredAlbum } from '@/types/review';
 
 export const dynamic = 'force-dynamic';
 

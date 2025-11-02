@@ -1,0 +1,30 @@
+export interface StoredAlbum {
+  id: string;
+  name: string;
+  artist: string;
+  image: string | null;
+  releaseDate: string;
+  notes: string;
+  rating: number | null;
+  spotifyUrl: string | null;
+}
+
+export interface StoredReview {
+  id: string;
+  playlistId: string;
+  playlistName: string;
+  playlistOwner: string;
+  playlistImage: string | null;
+  albums: StoredAlbum[];
+  imageDataUrl: string | null;
+  createdAt: string;
+}
+
+export interface ReviewInput {
+  playlistId: string;
+  playlistName: string;
+  playlistOwner: string;
+  playlistImage: string | null;
+  albums: StoredAlbum[];
+  imageDataUrl: string | null;
+}

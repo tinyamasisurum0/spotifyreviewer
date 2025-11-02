@@ -1,39 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import type { ReviewInput, StoredAlbum, StoredReview } from '@/types/review';
 
 const REVIEWS_FILE = path.join(process.cwd(), 'data', 'reviews.json');
-
-export interface StoredAlbum {
-  id: string;
-  name: string;
-  artist: string;
-  image: string | null;
-  releaseDate: string;
-  notes: string;
-  rating: number | null;
-  spotifyUrl: string | null;
-}
-
-export interface StoredReview {
-  id: string;
-  playlistId: string;
-  playlistName: string;
-  playlistOwner: string;
-  playlistImage: string | null;
-  albums: StoredAlbum[];
-  imageDataUrl: string | null;
-  createdAt: string;
-}
-
-export interface ReviewInput {
-  playlistId: string;
-  playlistName: string;
-  playlistOwner: string;
-  playlistImage: string | null;
-  albums: StoredAlbum[];
-  imageDataUrl: string | null;
-}
 
 async function ensureFilePresence() {
   try {
