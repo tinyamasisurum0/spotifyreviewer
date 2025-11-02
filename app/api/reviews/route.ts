@@ -14,6 +14,8 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const { playlistId, playlistName, playlistOwner, imageDataUrl, playlistImage } = payload ?? {};
     const albumsInput: unknown[] = Array.isArray(payload?.albums) ? payload.albums : [];
+    const normalizeLabel = (value: unknown) =>
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
     if (
       typeof playlistId !== 'string' ||
@@ -40,6 +42,7 @@ export async function POST(request: Request) {
           artist: typeof album.artist === 'string' ? (album.artist as string) : '',
           image: typeof album.image === 'string' ? (album.image as string) : null,
           releaseDate: typeof album.releaseDate === 'string' ? (album.releaseDate as string) : '',
+          label: normalizeLabel(album.label),
           notes: typeof album.notes === 'string' ? (album.notes as string) : '',
           rating: typeof album.rating === 'number' ? (album.rating as number) : null,
           spotifyUrl: typeof album.spotifyUrl === 'string' ? (album.spotifyUrl as string) : null,

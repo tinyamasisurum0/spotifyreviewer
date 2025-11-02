@@ -54,6 +54,58 @@ export async function getPlaylistTracks(playlistId: string) {
   }
 }
 
+type SpotifyAlbumDetail = {
+  id: string;
+  name: string;
+  label: string | null;
+  images: { url: string }[];
+  release_date: string;
+  external_urls?: { spotify?: string };
+};
+
+export async function getAlbumsDetails(ids: string[]): Promise<Record<string, SpotifyAlbumDetail>> {
+  const uniqueIds = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.trim().length > 0)));
+  if (uniqueIds.length === 0) {
+    return {};
+  }
+
+  const token = await getAccessToken();
+  const result: Record<string, SpotifyAlbumDetail> = {};
+  const chunkSize = 20;
+
+  for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+    const chunk = uniqueIds.slice(i, i + chunkSize);
+    try {
+      const response = await axios.get(`${SPOTIFY_BASE_URL}/albums`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          ids: chunk.join(','),
+        },
+      });
+
+      const albums = Array.isArray(response.data?.albums) ? response.data.albums : [];
+      albums.forEach((album: any) => {
+        if (album && typeof album.id === 'string') {
+          result[album.id] = {
+            id: album.id,
+            name: album.name ?? '',
+            label: album.label ?? null,
+            images: Array.isArray(album.images) ? album.images : [],
+            release_date: album.release_date ?? '',
+            external_urls: album.external_urls,
+          };
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching album details:', error);
+    }
+  }
+
+  return result;
+}
+
 export async function getPlaylistDetails(playlistId: string) {
   try {
     const token = await getAccessToken();

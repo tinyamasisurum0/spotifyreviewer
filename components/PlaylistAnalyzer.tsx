@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { getPlaylistTracks, getPlaylistDetails } from '../utils/spotifyApi';
+import { getPlaylistTracks, getPlaylistDetails, getAlbumsDetails } from '../utils/spotifyApi';
 import {
   DndContext,
   closestCenter,
@@ -19,8 +19,12 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
-import { Star, StarHalf, Trash2, Crown, Medal, Award } from 'lucide-react';
+import { Star, StarHalf, Trash2, ExternalLink } from 'lucide-react';
 import type { StoredAlbum } from '@/types/review';
+import { getRankDecoration } from '@/components/rankDecorations';
+
+const sanitizeLabel = (value?: string | null) =>
+  value && value.trim().length > 0 ? value.trim() : null;
 
 
 
@@ -33,12 +37,14 @@ interface SpotifyAlbum {
   artists: { name: string }[];
   release_date: string;
   external_urls?: { spotify?: string };
+  label?: string | null;
 }
 
 interface Album extends SpotifyAlbum {
   notes: string;
   rating: number | null;
   spotifyUrl: string | null;
+  label?: string | null;
 }
 
 interface SortableAlbumItemProps {
@@ -49,6 +55,8 @@ interface SortableAlbumItemProps {
   inputMode: InputMode;
   onDelete: (id: string) => void;
   showDeleteButton: boolean;
+  isRatingLocked: boolean;
+  hideSpotifyLinks: boolean;
 }
 
 interface InitialReviewData {
@@ -65,90 +73,12 @@ const mapStoredAlbumToAlbum = (stored: StoredAlbum): Album => ({
   release_date: stored.releaseDate,
   images: stored.image ? [{ url: stored.image }] : [],
   artists: [{ name: stored.artist || 'Unknown Artist' }],
+  label: stored.label && stored.label.trim().length > 0 ? stored.label.trim() : null,
   notes: stored.notes ?? '',
   rating: stored.rating ?? null,
   spotifyUrl: stored.spotifyUrl ?? null,
   external_urls: stored.spotifyUrl ? { spotify: stored.spotifyUrl } : undefined,
 });
-
-interface RankDecoration {
-  containerClass: string;
-  containerStyle?: React.CSSProperties;
-  badge: {
-    label: string;
-    className: string;
-    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-    iconClassName: string;
-  };
-  accentBarClass?: string;
-  numberClass?: string;
-  titleClass?: string;
-  artistClass?: string;
-}
-
-const getRankDecoration = (position: number): RankDecoration | null => {
-  switch (position) {
-    case 0:
-      return {
-        containerClass:
-          'bg-gray-900/80 border border-amber-300/60 shadow-[0_22px_45px_-25px_rgba(234,179,8,0.7)] backdrop-blur-sm',
-        containerStyle: {
-          backgroundImage: 'linear-gradient(135deg, rgba(253,224,71,0.42) 0%, rgba(17,24,39,0.94) 58%)',
-        },
-        badge: {
-          label: 'Gold Champion',
-          className:
-            'bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-500 text-gray-900 shadow-lg',
-          icon: Crown,
-          iconClassName: 'text-amber-600',
-        },
-        accentBarClass: 'bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500',
-        numberClass: 'text-amber-300 drop-shadow-[0_0_10px_rgba(250,204,21,0.85)]',
-        titleClass: 'text-amber-100',
-        artistClass: 'text-yellow-200/80',
-      };
-    case 1:
-      return {
-        containerClass:
-          'bg-slate-900/80 border border-slate-300/40 shadow-[0_20px_40px_-28px_rgba(148,163,184,0.6)] backdrop-blur-[2px]',
-        containerStyle: {
-          backgroundImage: 'linear-gradient(135deg, rgba(203,213,225,0.32) 0%, rgba(15,23,42,0.94) 62%)',
-        },
-        badge: {
-          label: 'Silver Runner-Up',
-          className:
-            'bg-gradient-to-r from-slate-100 via-slate-300 to-gray-400 text-gray-900 shadow-md',
-          icon: Medal,
-          iconClassName: 'text-slate-500',
-        },
-        accentBarClass: 'bg-gradient-to-r from-slate-200 via-slate-400 to-gray-500',
-        numberClass: 'text-slate-200',
-        titleClass: 'text-slate-100',
-        artistClass: 'text-slate-300',
-      };
-    case 2:
-      return {
-        containerClass:
-          'bg-stone-900/80 border border-orange-400/40 shadow-[0_18px_35px_-26px_rgba(234,88,12,0.6)] backdrop-blur-[1px]',
-        containerStyle: {
-          backgroundImage: 'linear-gradient(135deg, rgba(248,180,107,0.26) 0%, rgba(15,23,42,0.95) 66%)',
-        },
-        badge: {
-          label: 'Bronze Third',
-          className:
-            'bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600 text-gray-900 shadow',
-          icon: Award,
-          iconClassName: 'text-orange-700',
-        },
-        accentBarClass: 'bg-gradient-to-r from-orange-300 via-amber-500 to-orange-600',
-        numberClass: 'text-orange-200',
-        titleClass: 'text-orange-100',
-        artistClass: 'text-orange-200/80',
-      };
-    default:
-      return null;
-  }
-};
 
 function SortableAlbumItem({
   album,
@@ -158,6 +88,8 @@ function SortableAlbumItem({
   inputMode,
   onDelete,
   showDeleteButton,
+  isRatingLocked,
+  hideSpotifyLinks,
 }: SortableAlbumItemProps) {
   const {
     attributes,
@@ -210,6 +142,9 @@ function SortableAlbumItem({
   };
 
   const handleRatingClick = (event: React.MouseEvent<HTMLButtonElement>, starValue: number) => {
+    if (isRatingLocked) {
+      return;
+    }
     const nextRating = resolveRatingFromEvent(event, starValue);
     const isSameRating = album.rating != null && Math.abs(album.rating - nextRating) < 0.001;
     onRatingChange(album.id, isSameRating ? null : nextRating);
@@ -217,9 +152,13 @@ function SortableAlbumItem({
   };
 
   const handleRatingHover = (event: React.MouseEvent<HTMLButtonElement>, starValue: number) => {
+    if (isRatingLocked) {
+      return;
+    }
     const nextRating = resolveRatingFromEvent(event, starValue);
     setHoverRating(nextRating);
   };
+  const displayedRating = isRatingLocked ? album.rating ?? 0 : hoverRating ?? album.rating ?? 0;
 
   return (
     <div
@@ -259,6 +198,17 @@ function SortableAlbumItem({
             <p className="text-sm text-gray-500">
               Release Date: {new Date(album.release_date).toLocaleDateString()}
             </p>
+            {album.spotifyUrl && !hideSpotifyLinks && (
+              <a
+                href={album.spotifyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-green-300 transition-colors hover:text-green-200"
+              >
+                Open in Spotify
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
           </div>
         </div>
         {(showNotes || showRating) && (
@@ -269,12 +219,18 @@ function SortableAlbumItem({
                 className="rounded border border-gray-600 bg-gray-800 p-3"
               >
                 <p className="text-sm text-gray-400 mb-2">Rating</p>
-                <div className="flex flex-col gap-2" onMouseLeave={() => setHoverRating(null)}>
+                <div
+                  className="flex flex-col gap-2"
+                  onMouseLeave={() => {
+                    if (!isRatingLocked) {
+                      setHoverRating(null);
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-2">
                     {stars.map((star) => {
-                      const displayRating = hoverRating ?? album.rating ?? 0;
-                      const isFull = displayRating >= star;
-                      const isHalf = !isFull && displayRating >= star - 0.5;
+                      const isFull = displayedRating >= star;
+                      const isHalf = !isFull && displayedRating >= star - 0.5;
                       const iconClass = isFull || isHalf ? 'text-yellow-400' : 'text-gray-500';
                       const halfValue = Number((star - 0.5).toFixed(1));
                       const label = `Set rating to ${halfValue} or ${star} star${star > 1 ? 's' : ''}`;
@@ -283,11 +239,19 @@ function SortableAlbumItem({
                         <button
                           key={star}
                           type="button"
-                          onClick={(event) => handleRatingClick(event, star)}
-                          onMouseMove={(event) => handleRatingHover(event, star)}
-                          className={`relative h-8 w-8 transition-colors hover:text-yellow-300 focus:outline-none ${iconClass}`}
-                          aria-label={label}
-                          title={title}
+                          onClick={
+                            isRatingLocked ? undefined : (event) => handleRatingClick(event, star)
+                          }
+                          onMouseMove={
+                            isRatingLocked ? undefined : (event) => handleRatingHover(event, star)
+                          }
+                          tabIndex={isRatingLocked ? -1 : 0}
+                          aria-disabled={isRatingLocked}
+                          aria-label={isRatingLocked ? undefined : label}
+                          title={isRatingLocked ? undefined : title}
+                          className={`relative h-8 w-8 transition-colors focus:outline-none ${
+                            isRatingLocked ? 'cursor-default' : 'hover:text-yellow-300'
+                          } ${iconClass} ${isRatingLocked ? 'pointer-events-none' : ''}`}
                         >
                           <span className="pointer-events-none">
                             {isFull ? (
@@ -302,7 +266,9 @@ function SortableAlbumItem({
                       );
                     })}
                   </div>
-                  <span className="text-sm text-gray-400">{formatRating(hoverRating ?? album.rating)}</span>
+                  <span className="text-sm text-gray-400">
+                    {formatRating(isRatingLocked ? album.rating : hoverRating ?? album.rating)}
+                  </span>
                 </div>
               </div>
             )}
@@ -356,6 +322,7 @@ export default function PlaylistAnalyzer({
   onInputModeChange,
   initialData,
 }: PlaylistAnalyzerProps) {
+  const isRatingLocked = Boolean(initialData);
   const [albums, setAlbums] = useState<Album[]>(() =>
     initialData ? initialData.albums.map(mapStoredAlbumToAlbum) : []
   );
@@ -434,7 +401,7 @@ export default function PlaylistAnalyzer({
         setPlaylistOwner(owner);
         setPlaylistImage(image ?? null);
 
-        const uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
+        let uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
           const spotifyAlbum = item.track.album;
           const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
           const alreadyExists = acc.some((existing) => existing.id === albumId);
@@ -445,10 +412,50 @@ export default function PlaylistAnalyzer({
               notes: '',
               rating: null,
               spotifyUrl: spotifyAlbum.external_urls?.spotify ?? null,
+              label: sanitizeLabel(spotifyAlbum.label),
             });
           }
           return acc;
         }, []);
+
+        const albumIdsForDetails = uniqueAlbums
+          .map((album: Album) => album.id ?? '')
+          .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
+
+        if (albumIdsForDetails.length > 0) {
+          try {
+            const albumDetails = await getAlbumsDetails(albumIdsForDetails);
+            uniqueAlbums = uniqueAlbums.map((album: Album) => {
+              const details = albumDetails[album.id];
+              if (!details) {
+                return album;
+              }
+              const mergedImages =
+                album.images && album.images.length > 0
+                  ? album.images
+                  : Array.isArray(details.images)
+                    ? details.images
+                    : [];
+              const mergedLabel =
+                sanitizeLabel(album.label) ?? sanitizeLabel(details.label) ?? null;
+              const mergedReleaseDate =
+                album.release_date || details.release_date || album.release_date;
+              const mergedSpotifyUrl =
+                album.spotifyUrl ?? details.external_urls?.spotify ?? null;
+              return {
+                ...album,
+                label: mergedLabel,
+                images: mergedImages,
+                release_date: mergedReleaseDate,
+                spotifyUrl: mergedSpotifyUrl,
+                external_urls: album.external_urls ?? details.external_urls,
+              };
+            });
+          } catch (detailError) {
+            console.error('Failed to enrich album details', detailError);
+          }
+        }
+
         setAlbums(uniqueAlbums);
       } catch {
         if (!isCancelled) {
@@ -489,6 +496,9 @@ export default function PlaylistAnalyzer({
   };
 
   const handleRatingChange = (albumId: string, rating: number | null) => {
+    if (isRatingLocked) {
+      return;
+    }
     setAlbums(prevAlbums =>
       prevAlbums.map(album =>
         album.id === albumId ? { ...album, rating } : album
@@ -560,6 +570,7 @@ export default function PlaylistAnalyzer({
       artist: album.artists?.[0]?.name ?? '',
       image: album.images?.[0]?.url ?? null,
       releaseDate: album.release_date,
+      label: album.label && album.label.trim().length > 0 ? album.label.trim() : null,
       notes: album.notes,
       rating: album.rating,
       spotifyUrl: album.spotifyUrl,
@@ -672,6 +683,8 @@ export default function PlaylistAnalyzer({
                   inputMode={inputMode}
                   onDelete={handleDeleteAlbum}
                   showDeleteButton={!isPreparingDownload}
+                  isRatingLocked={isRatingLocked}
+                  hideSpotifyLinks={isPreparingDownload}
                 />
               ))}
             </div>

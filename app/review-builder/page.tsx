@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Copy } from 'lucide-react'
 import { extractPlaylistIdFromUrl } from '@/utils/spotifyApi'
@@ -8,7 +8,7 @@ import PlaylistAnalyzer, { InputMode } from '@/components/PlaylistAnalyzer'
 import { DragDropContext } from 'react-beautiful-dnd'
 import type { StoredReview } from '@/types/review'
 
-export default function ReviewBuilderPage() {
+function ReviewBuilderContent() {
   const searchParams = useSearchParams()
   const initialPlaylistId = searchParams.get('playlistId')
   const reviewId = searchParams.get('reviewId')
@@ -174,7 +174,29 @@ export default function ReviewBuilderPage() {
           />
         )}
       </div>
-      <div><p className="text-center m-6">Made by <a className='font-extrabold	underline' target='_blank' href="https://x.com/tinyamasisurum0">tinyamasisurum0</a> - Messages on X for feature requests are appreciated.</p></div>
+      <div>
+        <p className="text-center m-6">
+          Made by{' '}
+          <a className="font-extrabold underline" target="_blank" href="https://x.com/tinyamasisurum0">
+            tinyamasisurum0
+          </a>{' '}
+          - Messages on X for feature requests are appreciated.
+        </p>
+      </div>
     </DragDropContext>
+  )
+}
+
+export default function ReviewBuilderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-16 text-center text-gray-200 sm:px-6 lg:px-10">
+          Loading review builder…
+        </div>
+      }
+    >
+      <ReviewBuilderContent />
+    </Suspense>
   )
 }

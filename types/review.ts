@@ -4,6 +4,7 @@ export interface StoredAlbum {
   artist: string;
   image: string | null;
   releaseDate: string;
+  label: string | null;
   notes: string;
   rating: number | null;
   spotifyUrl: string | null;
