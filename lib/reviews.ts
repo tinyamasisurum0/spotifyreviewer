@@ -188,7 +188,8 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
       );
     `;
 
-    for (const [position, album] of input.albums.entries()) {
+    for (let position = 0; position < input.albums.length; position += 1) {
+      const album = input.albums[position];
       await sql`
         INSERT INTO review_albums (
           id,
