@@ -293,5 +293,5 @@ export async function deleteReviewById(id: string): Promise<boolean> {
     WHERE id = ${id}::uuid;
   `;
 
-  return result.rowCount !== undefined ? result.rowCount > 0 : false;
+  return Boolean(result.rowCount && result.rowCount > 0);
 }
