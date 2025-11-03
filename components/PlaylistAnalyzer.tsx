@@ -474,8 +474,7 @@ function EditableText({
   const displayValue = hasValue ? value : placeholder ?? '';
   const labelClasses = [
     fullWidth ? 'block' : 'inline-flex items-center',
-    'cursor-text',
-    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400',
+    'cursor-text rounded-sm transition-colors hover:bg-green-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400',
     className ?? '',
     hasValue ? '' : 'text-gray-500 italic',
   ]

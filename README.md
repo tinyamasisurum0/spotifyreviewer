@@ -18,6 +18,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+### Database setup
+
+Reviews are now stored in [Vercel Postgres](https://vercel.com/storage/postgres). Before running the API routes locally, install the new dependency and provide a connection string:
+
+1. Install dependencies (after pulling these changes):
+
+   ```bash
+   npm install
+   ```
+
+2. Add `POSTGRES_URL` (or `POSTGRES_URL_NON_POOLING`) to your environment. When running locally you can export it manually or use `npx vercel env pull` to sync from Vercel.
+
+The review tables are created automatically on first use, so no separate migration step is required.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
