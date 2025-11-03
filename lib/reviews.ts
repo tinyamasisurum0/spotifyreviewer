@@ -1,8 +1,5 @@
 import { randomUUID } from 'crypto';
 import { db } from '@vercel/postgres';
-
-const client = await db.connect(); 
-
 import type { ReviewInput, StoredAlbum, StoredReview, ReviewMode } from '@/types/review';
 
 type ReviewRow = {
@@ -31,6 +28,17 @@ const VALID_MODES: ReviewMode[] = ['review', 'plain', 'rating', 'both'];
 
 let schemaReady: Promise<void> | null = null;
 
+type DbClient = Awaited<ReturnType<typeof db.connect>>;
+
+async function withClient<T>(handler: (client: DbClient) => Promise<T>): Promise<T> {
+  const client = await db.connect();
+  try {
+    return await handler(client);
+  } finally {
+    client.release();
+  }
+}
+
 async function ensureSchema() {
   if (!schemaReady) {
     schemaReady = (async () => {
@@ -40,40 +48,42 @@ async function ensureSchema() {
         );
       }
 
-      await client.sql`
-        CREATE TABLE IF NOT EXISTS reviews (
-          id UUID PRIMARY KEY,
-          playlist_id TEXT NOT NULL,
-          playlist_name TEXT NOT NULL,
-          playlist_owner TEXT NOT NULL,
-          playlist_image TEXT,
-          image_data_url TEXT,
-          review_mode TEXT NOT NULL,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-      `;
+      await withClient(async (client) => {
+        await client.sql`
+          CREATE TABLE IF NOT EXISTS reviews (
+            id UUID PRIMARY KEY,
+            playlist_id TEXT NOT NULL,
+            playlist_name TEXT NOT NULL,
+            playlist_owner TEXT NOT NULL,
+            playlist_image TEXT,
+            image_data_url TEXT,
+            review_mode TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+        `;
 
-      await client.sql`
-        CREATE TABLE IF NOT EXISTS review_albums (
-          id UUID PRIMARY KEY,
-          review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
-          album_id TEXT NOT NULL,
-          position INTEGER NOT NULL,
-          name TEXT NOT NULL,
-          artist TEXT NOT NULL,
-          image TEXT,
-          release_date TEXT,
-          label TEXT,
-          notes TEXT,
-          rating REAL,
-          spotify_url TEXT
-        );
-      `;
+        await client.sql`
+          CREATE TABLE IF NOT EXISTS review_albums (
+            id UUID PRIMARY KEY,
+            review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+            album_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            image TEXT,
+            release_date TEXT,
+            label TEXT,
+            notes TEXT,
+            rating REAL,
+            spotify_url TEXT
+          );
+        `;
 
-      await client.sql`
-        CREATE INDEX IF NOT EXISTS review_albums_review_id_idx
-        ON review_albums (review_id, position);
-      `;
+        await client.sql`
+          CREATE INDEX IF NOT EXISTS review_albums_review_id_idx
+          ON review_albums (review_id, position);
+        `;
+      });
     })();
   }
 
@@ -116,31 +126,34 @@ function mapRowToReview(row: ReviewRow): StoredReview {
 export async function readReviews(): Promise<StoredReview[]> {
   await ensureSchema();
 
-  const { rows } = await client.sql<ReviewRow>`
-    SELECT
-      r.id          AS review_id,
-      r.playlist_id,
-      r.playlist_name,
-      r.playlist_owner,
-      r.playlist_image,
-      r.image_data_url,
-      r.review_mode,
-      r.created_at,
-      a.id          AS album_row_id,
-      a.album_id,
-      a.position,
-      a.name        AS album_name,
-      a.artist,
-      a.image       AS album_image,
-      a.release_date,
-      a.label,
-      a.notes,
-      a.rating,
-      a.spotify_url
-    FROM reviews r
-    LEFT JOIN review_albums a ON a.review_id = r.id
-    ORDER BY r.created_at DESC, a.position ASC;
-  `;
+  const rows = await withClient(async (client) => {
+    const { rows } = await client.sql<ReviewRow>`
+      SELECT
+        r.id          AS review_id,
+        r.playlist_id,
+        r.playlist_name,
+        r.playlist_owner,
+        r.playlist_image,
+        r.image_data_url,
+        r.review_mode,
+        r.created_at,
+        a.id          AS album_row_id,
+        a.album_id,
+        a.position,
+        a.name        AS album_name,
+        a.artist,
+        a.image       AS album_image,
+        a.release_date,
+        a.label,
+        a.notes,
+        a.rating,
+        a.spotify_url
+      FROM reviews r
+      LEFT JOIN review_albums a ON a.review_id = r.id
+      ORDER BY r.created_at DESC, a.position ASC;
+    `;
+    return rows;
+  });
 
   const grouped = new Map<string, StoredReview>();
 
@@ -166,69 +179,71 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
   const reviewId = randomUUID();
   const createdAt = new Date();
 
-  await client.sql`BEGIN`;
+  await withClient(async (client) => {
+    await client.sql`BEGIN`;
 
-  try {
-    await client.sql`
-      INSERT INTO reviews (
-        id,
-        playlist_id,
-        playlist_name,
-        playlist_owner,
-        playlist_image,
-        image_data_url,
-        review_mode,
-        created_at
-      ) VALUES (
-        ${reviewId}::uuid,
-        ${input.playlistId},
-        ${input.playlistName},
-        ${input.playlistOwner},
-        ${input.playlistImage},
-        ${input.imageDataUrl},
-        ${input.reviewMode},
-        ${createdAt.toISOString()}::timestamptz
-      );
-    `;
-
-    for (let position = 0; position < input.albums.length; position += 1) {
-      const album = input.albums[position];
+    try {
       await client.sql`
-        INSERT INTO review_albums (
+        INSERT INTO reviews (
           id,
-          review_id,
-          album_id,
-          position,
-          name,
-          artist,
-          image,
-          release_date,
-          label,
-          notes,
-          rating,
-          spotify_url
+          playlist_id,
+          playlist_name,
+          playlist_owner,
+          playlist_image,
+          image_data_url,
+          review_mode,
+          created_at
         ) VALUES (
-          ${randomUUID()}::uuid,
           ${reviewId}::uuid,
-          ${album.id},
-          ${position},
-          ${album.name},
-          ${album.artist},
-          ${album.image},
-          ${album.releaseDate},
-          ${album.label},
-          ${album.notes},
-          ${album.rating},
-          ${album.spotifyUrl}
+          ${input.playlistId},
+          ${input.playlistName},
+          ${input.playlistOwner},
+          ${input.playlistImage},
+          ${input.imageDataUrl},
+          ${input.reviewMode},
+          ${createdAt.toISOString()}::timestamptz
         );
       `;
-    }
 
-    await client.sql`COMMIT`;
-  } catch (error) {
-    await client.sql`ROLLBACK`;
-    throw error;
-  }
+      for (let position = 0; position < input.albums.length; position += 1) {
+        const album = input.albums[position];
+        await client.sql`
+          INSERT INTO review_albums (
+            id,
+            review_id,
+            album_id,
+            position,
+            name,
+            artist,
+            image,
+            release_date,
+            label,
+            notes,
+            rating,
+            spotify_url
+          ) VALUES (
+            ${randomUUID()}::uuid,
+            ${reviewId}::uuid,
+            ${album.id},
+            ${position},
+            ${album.name},
+            ${album.artist},
+            ${album.image},
+            ${album.releaseDate},
+            ${album.label},
+            ${album.notes},
+            ${album.rating},
+            ${album.spotifyUrl}
+          );
+        `;
+      }
+
+      await client.sql`COMMIT`;
+    } catch (error) {
+      await client.sql`ROLLBACK`;
+      throw error;
+    }
+  });
 
   return {
     id: reviewId,
@@ -246,32 +261,35 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
 export async function getReviewById(id: string): Promise<StoredReview | null> {
   await ensureSchema();
 
-  const { rows } = await client.sql<ReviewRow>`
-    SELECT
-      r.id          AS review_id,
-      r.playlist_id,
-      r.playlist_name,
-      r.playlist_owner,
-      r.playlist_image,
-      r.image_data_url,
-      r.review_mode,
-      r.created_at,
-      a.id          AS album_row_id,
-      a.album_id,
-      a.position,
-      a.name        AS album_name,
-      a.artist,
-      a.image       AS album_image,
-      a.release_date,
-      a.label,
-      a.notes,
-      a.rating,
-      a.spotify_url
-    FROM reviews r
-    LEFT JOIN review_albums a ON a.review_id = r.id
-    WHERE r.id = ${id}::uuid
-    ORDER BY a.position ASC;
-  `;
+  const rows = await withClient(async (client) => {
+    const { rows } = await client.sql<ReviewRow>`
+      SELECT
+        r.id          AS review_id,
+        r.playlist_id,
+        r.playlist_name,
+        r.playlist_owner,
+        r.playlist_image,
+        r.image_data_url,
+        r.review_mode,
+        r.created_at,
+        a.id          AS album_row_id,
+        a.album_id,
+        a.position,
+        a.name        AS album_name,
+        a.artist,
+        a.image       AS album_image,
+        a.release_date,
+        a.label,
+        a.notes,
+        a.rating,
+        a.spotify_url
+      FROM reviews r
+      LEFT JOIN review_albums a ON a.review_id = r.id
+      WHERE r.id = ${id}::uuid
+      ORDER BY a.position ASC;
+    `;
+    return rows;
+  });
 
   if (rows.length === 0) {
     return null;
@@ -291,10 +309,13 @@ export async function getReviewById(id: string): Promise<StoredReview | null> {
 export async function deleteReviewById(id: string): Promise<boolean> {
   await ensureSchema();
 
-  const result = await client.sql`
-    DELETE FROM reviews
-    WHERE id = ${id}::uuid;
-  `;
+  const affectedRows = await withClient(async (client) => {
+    const result = await client.sql`
+      DELETE FROM reviews
+      WHERE id = ${id}::uuid;
+    `;
+    return result.rowCount ?? 0;
+  });
 
-  return Boolean(result.rowCount && result.rowCount > 0);
+  return affectedRows > 0;
 }
