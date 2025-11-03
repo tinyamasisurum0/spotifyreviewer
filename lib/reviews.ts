@@ -1,5 +1,8 @@
 import { randomUUID } from 'crypto';
-import { sql } from '@vercel/postgres';
+import { db } from '@vercel/postgres';
+
+const client = await db.connect(); 
+
 import type { ReviewInput, StoredAlbum, StoredReview, ReviewMode } from '@/types/review';
 
 type ReviewRow = {
@@ -37,7 +40,7 @@ async function ensureSchema() {
         );
       }
 
-      await sql`
+      await client.sql`
         CREATE TABLE IF NOT EXISTS reviews (
           id UUID PRIMARY KEY,
           playlist_id TEXT NOT NULL,
@@ -50,7 +53,7 @@ async function ensureSchema() {
         );
       `;
 
-      await sql`
+      await client.sql`
         CREATE TABLE IF NOT EXISTS review_albums (
           id UUID PRIMARY KEY,
           review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
@@ -67,7 +70,7 @@ async function ensureSchema() {
         );
       `;
 
-      await sql`
+      await client.sql`
         CREATE INDEX IF NOT EXISTS review_albums_review_id_idx
         ON review_albums (review_id, position);
       `;
@@ -113,7 +116,7 @@ function mapRowToReview(row: ReviewRow): StoredReview {
 export async function readReviews(): Promise<StoredReview[]> {
   await ensureSchema();
 
-  const { rows } = await sql<ReviewRow>`
+  const { rows } = await client.sql<ReviewRow>`
     SELECT
       r.id          AS review_id,
       r.playlist_id,
@@ -163,10 +166,10 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
   const reviewId = randomUUID();
   const createdAt = new Date();
 
-  await sql`BEGIN`;
+  await client.sql`BEGIN`;
 
   try {
-    await sql`
+    await client.sql`
       INSERT INTO reviews (
         id,
         playlist_id,
@@ -190,7 +193,7 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
 
     for (let position = 0; position < input.albums.length; position += 1) {
       const album = input.albums[position];
-      await sql`
+      await client.sql`
         INSERT INTO review_albums (
           id,
           review_id,
@@ -221,9 +224,9 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
       `;
     }
 
-    await sql`COMMIT`;
+    await client.sql`COMMIT`;
   } catch (error) {
-    await sql`ROLLBACK`;
+    await client.sql`ROLLBACK`;
     throw error;
   }
 
@@ -243,7 +246,7 @@ export async function addReview(input: ReviewInput): Promise<StoredReview> {
 export async function getReviewById(id: string): Promise<StoredReview | null> {
   await ensureSchema();
 
-  const { rows } = await sql<ReviewRow>`
+  const { rows } = await client.sql<ReviewRow>`
     SELECT
       r.id          AS review_id,
       r.playlist_id,
@@ -288,7 +291,7 @@ export async function getReviewById(id: string): Promise<StoredReview | null> {
 export async function deleteReviewById(id: string): Promise<boolean> {
   await ensureSchema();
 
-  const result = await sql`
+  const result = await client.sql`
     DELETE FROM reviews
     WHERE id = ${id}::uuid;
   `;
