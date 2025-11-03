@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { db } from '@vercel/postgres';
+import type { VercelPoolClient } from '@vercel/postgres';
 import type { ReviewInput, StoredAlbum, StoredReview, ReviewMode } from '@/types/review';
 
 type ReviewRow = {
@@ -28,9 +29,7 @@ const VALID_MODES: ReviewMode[] = ['review', 'plain', 'rating', 'both'];
 
 let schemaReady: Promise<void> | null = null;
 
-type DbClient = Awaited<ReturnType<typeof db.connect>>;
-
-async function withClient<T>(handler: (client: DbClient) => Promise<T>): Promise<T> {
+async function withClient<T>(handler: (client: VercelPoolClient) => Promise<T>): Promise<T> {
   const client = await db.connect();
   try {
     return await handler(client);
