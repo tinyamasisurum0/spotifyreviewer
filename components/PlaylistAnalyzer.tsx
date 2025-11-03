@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { getPlaylistTracks, getPlaylistDetails, getAlbumsDetails } from '../utils/spotifyApi';
 import {
@@ -14,21 +14,20 @@ import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
+  rectSortingStrategy,
   verticalListSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
 import { Star, StarHalf, Trash2, ExternalLink } from 'lucide-react';
-import type { StoredAlbum } from '@/types/review';
+import type { StoredAlbum, ReviewMode } from '@/types/review';
 import { getRankDecoration } from '@/components/rankDecorations';
 
 const sanitizeLabel = (value?: string | null) =>
   value && value.trim().length > 0 ? value.trim() : null;
 
-
-
-export type InputMode = 'review' | 'rating' | 'both';
+export type InputMode = ReviewMode;
 
 interface SpotifyAlbum {
   id: string;
@@ -57,6 +56,7 @@ interface SortableAlbumItemProps {
   showDeleteButton: boolean;
   isRatingLocked: boolean;
   hideSpotifyLinks: boolean;
+  hideRankDecorations: boolean;
 }
 
 interface InitialReviewData {
@@ -90,6 +90,7 @@ function SortableAlbumItem({
   showDeleteButton,
   isRatingLocked,
   hideSpotifyLinks,
+  hideRankDecorations,
 }: SortableAlbumItemProps) {
   const {
     attributes,
@@ -101,7 +102,7 @@ function SortableAlbumItem({
   } = useSortable({ id: album.id });
   const [hoverRating, setHoverRating] = useState<number | null>(null);
 
-  const rankDecoration = getRankDecoration(index);
+  const rankDecoration = hideRankDecorations ? null : getRankDecoration(index);
   const badge = rankDecoration?.badge;
   const BadgeIcon = badge?.icon;
   const baseStyle: React.CSSProperties = {
@@ -303,6 +304,203 @@ function SortableAlbumItem({
   );
 }
 
+function SortablePlainAlbumItem({
+  album,
+  onDelete,
+  showDeleteButton,
+  hideSpotifyLinks,
+}: {
+  album: Album;
+  onDelete: (id: string) => void;
+  showDeleteButton: boolean;
+  hideSpotifyLinks: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: album.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  const artist = album.artists[0]?.name?.trim() || 'Unknown Artist';
+  const label = sanitizeLabel(album.label) ?? 'Unknown Label';
+  let releaseDate = 'Unknown date';
+  if (album.release_date) {
+    try {
+      releaseDate = new Date(album.release_date).toLocaleDateString();
+    } catch {
+      releaseDate = album.release_date;
+    }
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        className={`flex cursor-move flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/70 p-3 text-sm shadow transition ${
+          isDragging ? 'ring-2 ring-green-400' : 'hover:border-gray-700'
+        }`}
+      >
+        <div className="relative aspect-square w-full overflow-hidden rounded-md border border-gray-800 bg-gray-950/80">
+          {album.images[0]?.url ? (
+            <Image src={album.images[0].url} alt={album.name} fill className="object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs uppercase tracking-wide text-gray-500">
+              No Image
+            </div>
+          )}
+          {album.spotifyUrl && !hideSpotifyLinks && (
+            <a
+              href={album.spotifyUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-gray-200 transition hover:bg-black/90"
+              aria-label={`Open ${album.name} in Spotify`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+        <div className="space-y-1">
+          <h3 className="truncate text-sm font-semibold text-white">{album.name}</h3>
+          <p className="truncate text-xs text-gray-400">{artist}</p>
+          <p className="text-xs text-gray-500">Released {releaseDate}</p>
+          <p className="truncate text-xs text-gray-500">Label · {label}</p>
+        </div>
+      </div>
+      {showDeleteButton && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(album.id);
+          }}
+          className="absolute -right-2 -top-2 rounded-full bg-gray-950/90 p-1.5 text-gray-400 shadow-lg ring-1 ring-gray-700 transition hover:text-red-400"
+          aria-label={`Remove ${album.name} from the list`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+interface EditableTextProps {
+  value: string;
+  onChange: (nextValue: string) => void;
+  className?: string;
+  placeholder?: string;
+  ariaLabel: string;
+  fullWidth?: boolean;
+}
+
+function EditableText({
+  value,
+  onChange,
+  className,
+  placeholder,
+  ariaLabel,
+  fullWidth,
+}: EditableTextProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraft(value);
+    }
+  }, [value, isEditing]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const commit = useCallback(() => {
+    const nextValue = draft.trim();
+    onChange(nextValue);
+    setIsEditing(false);
+  }, [draft, onChange]);
+
+  const cancel = useCallback(() => {
+    setDraft(value);
+    setIsEditing(false);
+  }, [value]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commit();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancel();
+      }
+    },
+    [commit, cancel]
+  );
+
+  if (isEditing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        aria-label={ariaLabel}
+        placeholder={placeholder}
+        className={`rounded border border-gray-600 bg-gray-900 px-2 py-1 text-inherit focus:border-green-400 focus:outline-none ${
+          fullWidth ? 'w-full' : ''
+        } ${className ?? ''}`}
+      />
+    );
+  }
+
+  const hasValue = value.trim().length > 0;
+  const displayValue = hasValue ? value : placeholder ?? '';
+  const labelClasses = [
+    fullWidth ? 'block' : 'inline-flex items-center',
+    'cursor-text',
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400',
+    className ?? '',
+    hasValue ? '' : 'text-gray-500 italic',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={() => setIsEditing(true)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setIsEditing(true);
+        }
+      }}
+      className={labelClasses}
+      aria-label={ariaLabel}
+    >
+      {displayValue || '\u00A0'}
+    </span>
+  );
+}
+
 interface SpotifyTrack {
   track: {
     album: SpotifyAlbum;
@@ -338,6 +536,7 @@ export default function PlaylistAnalyzer({
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [hideRankDecorations, setHideRankDecorations] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -589,6 +788,7 @@ export default function PlaylistAnalyzer({
           playlistImage,
           albums: serializedAlbums,
           imageDataUrl: generatedImageUrl,
+          reviewMode: inputMode,
         }),
       });
 
@@ -626,7 +826,7 @@ export default function PlaylistAnalyzer({
       <div className="mb-6">
         <p className="text-sm uppercase tracking-wide text-gray-400 mb-2">Review Mode</p>
         <div className="flex flex-wrap gap-3">
-          {(['review', 'rating', 'both'] as InputMode[]).map((mode) => (
+          {(['review', 'plain', 'rating', 'both'] as InputMode[]).map((mode) => (
             <label
               key={mode}
               className={`flex items-center space-x-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -645,22 +845,56 @@ export default function PlaylistAnalyzer({
             </label>
           ))}
         </div>
+        <div className="mt-4">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+            <input
+              type="checkbox"
+              checked={hideRankDecorations}
+              onChange={(event) => setHideRankDecorations(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-700 bg-gray-900 text-green-500 focus:ring-green-400"
+            />
+            <span>Unordered List</span>
+          </label>
+        </div>
       </div>
       <div ref={contentRef} className="p-3 sm:p-4 lg:p-6">
-        <div className="mb-4 flex items-center gap-4">
-          {playlistImage && (
-            <Image
-              src={playlistImage}
-              alt={`Cover art for ${playlistName}`}
-              width={96}
-              height={96}
-              className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/10 sm:h-20 sm:w-20"
-            />
-          )}
-          <div>
-            <h2 className="text-2xl font-bold">{playlistName}</h2>
-            <p className="text-gray-400">Created by {playlistOwner || 'Unknown creator'}</p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {playlistImage && (
+              <Image
+                src={playlistImage}
+                alt={`Cover art for ${playlistName}`}
+                width={96}
+                height={96}
+                className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/10 sm:h-20 sm:w-20"
+              />
+            )}
+            <div className="space-y-1">
+              <EditableText
+                value={playlistName}
+                onChange={setPlaylistName}
+                className="text-2xl font-bold text-white"
+                placeholder="Untitled playlist"
+                ariaLabel="Edit playlist name"
+                fullWidth
+              />
+              <p className="text-gray-400">
+                Created by{' '}
+                <EditableText
+                  value={playlistOwner}
+                  onChange={setPlaylistOwner}
+                  className="font-medium text-gray-300"
+                  placeholder="Unknown creator"
+                  ariaLabel="Edit playlist owner"
+                />
+              </p>
+            </div>
           </div>
+          {hideRankDecorations && (
+            <span className="rounded border border-gray-700 bg-gray-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-300">
+              Unordered List
+            </span>
+          )}
         </div>
         <DndContext
           sensors={sensors}
@@ -669,25 +903,40 @@ export default function PlaylistAnalyzer({
         >
           <SortableContext
             items={albums.map(album => album.id)}
-            strategy={verticalListSortingStrategy}
+            strategy={inputMode === 'plain' ? rectSortingStrategy : verticalListSortingStrategy}
           >
 
-            <div className="space-y-4">
-              {albums.map((album, index) => (
-                <SortableAlbumItem
-                  key={album.id}
-                  album={album}
-                  index={index}
-                  onNotesChange={handleNotesChange}
-                  onRatingChange={handleRatingChange}
-                  inputMode={inputMode}
-                  onDelete={handleDeleteAlbum}
-                  showDeleteButton={!isPreparingDownload}
-                  isRatingLocked={isRatingLocked}
-                  hideSpotifyLinks={isPreparingDownload}
-                />
+            {inputMode === 'plain' ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {albums.map((album) => (
+                  <SortablePlainAlbumItem
+                    key={album.id}
+                    album={album}
+                    onDelete={handleDeleteAlbum}
+                    showDeleteButton={!isPreparingDownload}
+                    hideSpotifyLinks={isPreparingDownload}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {albums.map((album, index) => (
+                  <SortableAlbumItem
+                    key={album.id}
+                    album={album}
+                    index={index}
+                    onNotesChange={handleNotesChange}
+                    onRatingChange={handleRatingChange}
+                    inputMode={inputMode}
+                    onDelete={handleDeleteAlbum}
+                    showDeleteButton={!isPreparingDownload}
+                    isRatingLocked={isRatingLocked}
+                    hideSpotifyLinks={isPreparingDownload}
+                    hideRankDecorations={hideRankDecorations}
+                  />
               ))}
             </div>
+          )}
           </SortableContext>
         </DndContext>
       </div>

@@ -35,7 +35,7 @@ const waitForRender = async () => {
 export default function ReviewDetailClient({ review }: ReviewDetailClientProps) {
   const plainViewRef = useRef<HTMLDivElement>(null);
   const detailsViewRef = useRef<HTMLDivElement>(null);
-  const [isPlainView, setIsPlainView] = useState(false);
+  const [isPlainView, setIsPlainView] = useState(review.reviewMode === 'plain');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);

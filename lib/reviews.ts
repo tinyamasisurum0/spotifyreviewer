@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import type { ReviewInput, StoredReview } from '@/types/review';
+import type { ReviewInput, StoredReview, ReviewMode } from '@/types/review';
 
 const REVIEWS_FILE = path.join(process.cwd(), 'data', 'reviews.json');
 
@@ -21,10 +21,19 @@ export async function readReviews(): Promise<StoredReview[]> {
     const data = JSON.parse(raw);
     if (Array.isArray(data)) {
       return data.map((item) => {
-        const review = item as StoredReview & { playlistImage?: unknown };
+        const review = item as StoredReview & {
+          playlistImage?: unknown;
+          reviewMode?: unknown;
+        };
+        const allowedModes: ReviewMode[] = ['review', 'plain', 'rating', 'both'];
+        const inferredMode =
+          typeof review.reviewMode === 'string' && allowedModes.includes(review.reviewMode as ReviewMode)
+            ? (review.reviewMode as ReviewMode)
+            : 'review';
         return {
           ...review,
           playlistImage: typeof review.playlistImage === 'string' ? review.playlistImage : null,
+          reviewMode: inferredMode,
         } satisfies StoredReview;
       });
     }

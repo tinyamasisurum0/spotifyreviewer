@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addReview, readReviews } from '@/lib/reviews';
-import type { StoredAlbum } from '@/types/review';
+import type { StoredAlbum, ReviewMode } from '@/types/review';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-    const { playlistId, playlistName, playlistOwner, imageDataUrl, playlistImage } = payload ?? {};
+    const { playlistId, playlistName, playlistOwner, imageDataUrl, playlistImage, reviewMode } =
+      payload ?? {};
     const albumsInput: unknown[] = Array.isArray(payload?.albums) ? payload.albums : [];
     const normalizeLabel = (value: unknown) =>
       typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -50,6 +51,12 @@ export async function POST(request: Request) {
       })
       .filter((album): album is StoredAlbum => Boolean(album));
 
+    const allowedModes: ReviewMode[] = ['review', 'plain', 'rating', 'both'];
+    const normalizedReviewMode =
+      typeof reviewMode === 'string' && allowedModes.includes(reviewMode as ReviewMode)
+        ? (reviewMode as ReviewMode)
+        : 'review';
+
     const review = await addReview({
       playlistId,
       playlistName,
@@ -57,6 +64,7 @@ export async function POST(request: Request) {
       playlistImage: typeof playlistImage === 'string' ? playlistImage : null,
       albums,
       imageDataUrl: typeof imageDataUrl === 'string' ? imageDataUrl : null,
+      reviewMode: normalizedReviewMode,
     });
 
     return NextResponse.json(review, { status: 201 });

@@ -66,6 +66,7 @@ function ReviewBuilderContent() {
         setPreloadedReview(data)
         setPlaylistId(data.playlistId)
         setPlaylistUrl(`https://open.spotify.com/playlist/${data.playlistId}`)
+        setInputMode(data.reviewMode)
       } catch (error) {
         if (isCancelled) return
         console.error('Failed to load saved review', error)
@@ -84,6 +85,12 @@ function ReviewBuilderContent() {
       isCancelled = true
     }
   }, [reviewId])
+
+  useEffect(() => {
+    if (preloadedReview?.reviewMode) {
+      setInputMode(preloadedReview.reviewMode)
+    }
+  }, [preloadedReview?.reviewMode])
 
   const handleCopySampleLink = async () => {
     try {

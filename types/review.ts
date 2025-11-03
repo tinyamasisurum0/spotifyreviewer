@@ -1,3 +1,5 @@
+export type ReviewMode = 'review' | 'plain' | 'rating' | 'both';
+
 export interface StoredAlbum {
   id: string;
   name: string;
@@ -18,6 +20,7 @@ export interface StoredReview {
   playlistImage: string | null;
   albums: StoredAlbum[];
   imageDataUrl: string | null;
+  reviewMode: ReviewMode;
   createdAt: string;
 }
 
@@ -28,4 +31,5 @@ export interface ReviewInput {
   playlistImage: string | null;
   albums: StoredAlbum[];
   imageDataUrl: string | null;
+  reviewMode: ReviewMode;
 }
