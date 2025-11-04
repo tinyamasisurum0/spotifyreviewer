@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Link from "next/link";
+import { Analytics } from "@vercel/analytics/next";
 import { HeaderNav } from "@/components/HeaderNav";
 
 const geistSans = localFont({
@@ -86,6 +87,7 @@ export default function RootLayout({
           </div>
         </header>
         <main>{children}</main>
+        <Analytics />
       </body>
     </html>
   );
