@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
@@ -14,6 +15,24 @@ const getParamValue = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value ?? '';
 
 export const dynamic = 'force-dynamic';
+
+const title = 'Playlist Review Admin Dashboard';
+const description =
+  'Secure dashboard for managing Spotify playlist reviews saved on myrating.space. View entries, audit album details, and remove outdated content.';
+
+export function generateMetadata(): Metadata {
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: '/admin',
+    },
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
+}
 
 const formatDate = (iso: string) => {
   try {

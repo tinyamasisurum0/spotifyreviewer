@@ -41,8 +41,8 @@ export default function ReviewDetailClient({ review }: ReviewDetailClientProps) 
   const [showDownloadOptions, setShowDownloadOptions] = useState(false);
   const [activeDownloadMode, setActiveDownloadMode] = useState<'plain' | 'detailed' | null>(null);
 
-  const handleTogglePlainView = useCallback(() => {
-    setIsPlainView((prev) => !prev);
+  const handleViewChange = useCallback((nextIsPlain: boolean) => {
+    setIsPlainView(nextIsPlain);
   }, []);
 
   const handleDownload = useCallback(
@@ -176,7 +176,7 @@ export default function ReviewDetailClient({ review }: ReviewDetailClientProps) 
         <ReviewAlbumsDisplay
           albums={review.albums}
           isPlainView={isPlainView}
-          onTogglePlainView={handleTogglePlainView}
+          onViewChange={handleViewChange}
           plainViewRef={plainViewRef}
           detailsViewRef={detailsViewRef}
           hideSpotifyLinks={isDownloading && activeDownloadMode === 'plain'}

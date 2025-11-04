@@ -1,8 +1,34 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
 
 export const dynamic = 'force-dynamic';
+
+const title = 'Latest Spotify Playlist Reviews';
+const description =
+  'Browse every Spotify playlist review shared with myrating.space. Discover standout albums, artists, and curated rankings from music fans.';
+
+export function generateMetadata(): Metadata {
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: '/reviews',
+    },
+    openGraph: {
+      title,
+      description,
+      url: '/reviews',
+      type: 'website',
+    },
+    twitter: {
+      title,
+      description,
+      card: 'summary_large_image',
+    },
+  };
+}
 
 const formatDate = (iso: string) => {
   try {
@@ -45,39 +71,57 @@ export default async function ReviewsPage() {
           No shared reviews yet. Create one on the home page and save it to see it listed here.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((review) => (
             <Link
               key={review.id}
               href={`/reviews/${review.id}`}
-              className="group flex h-full flex-col rounded-lg border border-gray-800 bg-gray-900/70 p-3 shadow-md transition-colors hover:border-green-400/60 sm:p-4"
+              className="group flex h-full flex-col rounded-lg border border-gray-800 bg-gray-900/80 p-4 shadow-md transition-colors hover:border-emerald-400/60"
             >
-              {review.playlistImage ? (
-                <div className="mb-3 overflow-hidden rounded-md border border-gray-800">
-                  <Image
-                    src={review.playlistImage}
-                    alt={`Cover art for ${review.playlistName}`}
-                    width={320}
-                    height={320}
-                    sizes="160px"
-                    className="h-28 w-full object-cover sm:h-32"
-                  />
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  {review.playlistImage ? (
+                    <div className="relative h-24 w-24 overflow-hidden rounded-md border border-gray-800">
+                      <Image
+                        src={review.playlistImage}
+                        alt={`Cover art for ${review.playlistName}`}
+                        fill
+                        sizes="96px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-md border border-dashed border-gray-700 text-[10px] uppercase tracking-wide text-gray-500">
+                      No image
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="mb-3 flex h-28 w-full items-center justify-center rounded-md border border-dashed border-gray-700 text-xs uppercase tracking-wide text-gray-500 sm:h-32">
-                  No cover image
-                </div>
-              )}
-              <div className="min-w-0 flex-1 space-y-2">
-                <h2 className="truncate text-base font-semibold text-white transition-colors group-hover:text-green-200 sm:text-lg">
-                  {review.playlistName}
-                </h2>
-                <p className="text-[11px] uppercase tracking-wide text-gray-500 sm:text-xs">
-                  {review.playlistOwner || 'Unknown owner'}
-                </p>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400 sm:text-xs">
-                  <span>Albums: {review.albums.length}</span>
-                  <span className="truncate">Shared {formatDate(review.createdAt)}</span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="space-y-1">
+                    <h2 className="truncate text-base font-semibold text-white transition-colors group-hover:text-emerald-200">
+                      {review.playlistName}
+                    </h2>
+                    <p className="text-xs uppercase tracking-wide text-gray-500">
+                      {review.playlistOwner || 'Unknown owner'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {review.albums.length} album{review.albums.length === 1 ? '' : 's'}
+                    </span>
+                    <span className="truncate">Shared {formatDate(review.createdAt)}</span>
+                  </div>
+                  {review.albums.length > 0 && (
+                    <p className="line-clamp-2 text-xs text-gray-300">
+                      Featuring{' '}
+                      {review.albums
+                        .slice(0, 2)
+                        .map((album) => `${album.name} — ${album.artist || 'Unknown Artist'}`)
+                        .join('; ')}
+                      {review.albums.length > 2 ? '…' : ''}
+                    </p>
+                  )}
                 </div>
               </div>
             </Link>

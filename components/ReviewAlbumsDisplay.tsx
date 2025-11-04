@@ -2,14 +2,14 @@
 
 import type { RefObject } from 'react';
 import Image from 'next/image';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Grid, LayoutList } from 'lucide-react';
 import type { StoredAlbum } from '@/types/review';
 import ReviewAlbumCard from '@/components/ReviewAlbumCard';
 
 interface ReviewAlbumsDisplayProps {
   albums: StoredAlbum[];
   isPlainView: boolean;
-  onTogglePlainView: () => void;
+  onViewChange: (nextIsPlain: boolean) => void;
   plainViewRef: RefObject<HTMLDivElement>;
   detailsViewRef: RefObject<HTMLDivElement>;
   hideSpotifyLinks?: boolean;
@@ -69,21 +69,45 @@ function PlainAlbumTile({ album, hideSpotifyLinks }: { album: StoredAlbum; hideS
 export default function ReviewAlbumsDisplay({
   albums,
   isPlainView,
-  onTogglePlainView,
+  onViewChange,
   plainViewRef,
   detailsViewRef,
   hideSpotifyLinks,
 }: ReviewAlbumsDisplayProps) {
+  const buttonClass = (isActive: boolean) =>
+    `inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
+      isActive
+        ? 'bg-emerald-500/20 text-emerald-100 shadow-inner border border-emerald-400'
+        : 'text-gray-300 border border-transparent hover:text-emerald-200 hover:bg-gray-800/70'
+    }`;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onTogglePlainView}
-          className="rounded-md border border-gray-700 bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:border-gray-500 hover:bg-gray-800"
+        <div
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/80 p-1"
+          role="group"
+          aria-label="Toggle album view"
         >
-          {isPlainView ? 'Detailed View' : 'Plain View'}
-        </button>
+          <button
+            type="button"
+            onClick={() => onViewChange(false)}
+            aria-pressed={!isPlainView}
+            className={buttonClass(!isPlainView)}
+          >
+            <LayoutList className="h-4 w-4" aria-hidden="true" />
+            <span>Detailed View</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewChange(true)}
+            aria-pressed={isPlainView}
+            className={buttonClass(isPlainView)}
+          >
+            <Grid className="h-4 w-4" aria-hidden="true" />
+            <span>Plain View</span>
+          </button>
+        </div>
       </div>
       <div className={isPlainView ? 'pb-6' : 'hidden'} ref={plainViewRef}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
