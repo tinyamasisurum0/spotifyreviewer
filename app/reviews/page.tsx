@@ -49,29 +49,27 @@ export default async function ReviewsPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-10 text-gray-100 sm:px-6 lg:px-10">
-      <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Review Listing</h1>
-          <p className="text-sm text-gray-400">
-            Browse every playlist review that has been shared from the generator.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/review-builder"
-            className="inline-flex items-center gap-2 rounded bg-green-500 px-3 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.03] hover:bg-green-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-300"
-          >
-            Start a new review
-          </Link>
-        </div>
+      <div className="mb-8 flex justify-center">
+        <Link
+          href="/review-builder"
+          className="inline-flex min-w-[220px] items-center justify-center rounded-xl border border-emerald-400 bg-gray-900/60 px-6 py-3 text-base font-semibold text-emerald-200 shadow-md transition hover:border-emerald-300 hover:text-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+        >
+          Start Your Review
+        </Link>
+      </div>
+      <header className="mb-6 text-center sm:text-left">
+        <h1 className="text-3xl font-bold">Reviews Shared by Other People</h1>
+        <p className="text-sm text-gray-400">
+          Browse every playlist review that has been shared from the generator.
+        </p>
       </header>
 
       {sorted.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-700 bg-gray-800/70 p-10 text-center text-gray-400">
+        <div className="mt-6 rounded-lg border border-dashed border-gray-700 bg-gray-800/70 p-10 text-center text-gray-400">
           No shared reviews yet. Create one on the home page and save it to see it listed here.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((review) => (
             <Link
               key={review.id}

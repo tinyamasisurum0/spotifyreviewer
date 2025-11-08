@@ -117,50 +117,53 @@ function InnerReviewBuilder() {
 
   return (
     <DragDropContext onDragEnd={() => {}}>
-      <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-8 text-gray-100 sm:px-6 lg:px-10">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold">Create a Spotify Album Review</h1>
-        </div>
-        <div className="text-sm mb-3 space-y-1">
-          <p className="font-semibold text-gray-200">Build your album roundup in minutes:</p>
-          <ol className="list-decimal list-inside text-gray-300 space-y-1">
-            <li>Paste a Spotify playlist link below.</li>
-            <li>See every album ready for ratings and drag-and-drop ordering.</li>
-            <li>Download the lineup as a JPEG or share it with your friends.</li>
-          </ol>
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs">
-            <span className="uppercase tracking-wide text-gray-500">Sample playlist</span>
-            <a
-              href={samplePlaylistUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="font-mono text-gray-300 hover:text-green-300 transition-colors truncate max-w-[220px] sm:max-w-[320px]"
-            >
-              {samplePlaylistUrl}
-            </a>
-            <button
-              type="button"
-              onClick={handleCopySampleLink}
-              className="inline-flex items-center gap-1 rounded border border-gray-700 px-2 py-1 text-gray-200 hover:border-green-400 hover:text-green-300 transition-colors"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              <span>{copiedSampleLink ? 'Copied!' : 'Copy link'}</span>
-            </button>
+      <div className="mx-auto min-h-screen max-w-6xl bg-gradient-to-b from-gray-950 via-gray-900 to-black px-4 py-8 text-gray-100 sm:px-6 lg:px-10">
+        <div className="mb-5 grid gap-3 rounded-2xl border border-gray-800/70 bg-gray-950/70 p-4 text-sm text-gray-200 sm:grid-cols-3">
+          <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
+            <p className="text-xs font-semibold uppercase text-gray-400">Step 1</p>
+            <p className="mt-1 text-base font-medium">Paste your Playlist link to pull every album instantly.</p>
           </div>
+          <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
+            <p className="text-xs font-semibold uppercase text-gray-400">Step 2</p>
+            <p className="mt-1 text-base font-medium">Rate, reorder, and fine tune the lineup with drag-and-drop.</p>
+          </div>
+          <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
+            <p className="text-xs font-semibold uppercase text-gray-400">Step 3</p>
+            <p className="mt-1 text-base font-medium">Export or share once your Playlist link looks perfect.</p>
+          </div>
+        </div>
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-800 bg-gray-900/50 px-4 py-3 text-xs shadow-inner shadow-black/40">
+          <span className="uppercase tracking-wide text-gray-400">Sample playlist</span>
+          <a
+            href={samplePlaylistUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-gray-200 transition-colors hover:text-emerald-300 truncate max-w-[240px] sm:max-w-[320px]"
+          >
+            {samplePlaylistUrl}
+          </a>
+          <button
+            type="button"
+            onClick={handleCopySampleLink}
+            className="inline-flex items-center gap-1 rounded-full border border-gray-700 px-3 py-1 text-gray-200 transition-colors hover:border-emerald-400 hover:text-emerald-300"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            <span>{copiedSampleLink ? 'Copied!' : 'Copy link'}</span>
+          </button>
         </div>
         <form onSubmit={handleSubmit} className="mb-8">
           <input
             type="text"
             value={playlistUrl}
             onChange={(e) => setPlaylistUrl(e.target.value)}
-            placeholder="Enter Spotify playlist URL"
-            className="w-full p-2 border border-gray-700 rounded bg-gray-800 text-gray-100 placeholder-gray-500 mb-2"
+            placeholder="Drop your playlist link to get started"
+            className="mb-3 w-full rounded-2xl border border-gray-700/80 bg-gray-900/70 px-4 py-3 text-base text-gray-100 placeholder-gray-500 transition focus:border-emerald-400 focus:outline-none"
           />
           <button
             type="submit"
-            className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-semibold text-gray-900 transition hover:bg-emerald-400 sm:w-auto sm:px-6"
           >
-            Get Playlist
+            Load Albums
           </button>
         </form>
         {loadingReview && !preloadError && (
