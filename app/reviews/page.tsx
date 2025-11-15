@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
+import { readTierLists } from '@/lib/tierLists';
+import { tierDefinitions } from '@/data/tierMaker';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +44,11 @@ const formatDate = (iso: string) => {
 };
 
 export default async function ReviewsPage() {
-  const reviews = await readReviews();
+  const [reviews, tierLists] = await Promise.all([readReviews(), readTierLists()]);
   const sorted = [...reviews].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const sortedTierLists = [...tierLists].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
@@ -126,6 +131,93 @@ export default async function ReviewsPage() {
           ))}
         </div>
       )}
+
+      <section id="tier-lists" className="mt-16 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Shared Tier Lists</h2>
+            <p className="text-sm text-gray-400">
+              Playlist curators dragging their albums into S → C lanes.
+            </p>
+          </div>
+          <Link
+            href="/tier-maker"
+            className="inline-flex min-w-[200px] items-center justify-center rounded-xl border border-emerald-400 bg-gray-900/60 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-md transition hover:border-emerald-300 hover:text-emerald-100"
+          >
+            Launch Tier Maker
+          </Link>
+        </div>
+        {sortedTierLists.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-700 bg-gray-800/70 p-8 text-center text-gray-400">
+            Tier maker saves will show up here once someone shares their board.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {sortedTierLists.map((tierList) => {
+              const artPreview = tierList.albums
+                .filter((album) => album.tier !== 'unranked' && album.image)
+                .slice(0, 4);
+              const tierCounts = tierDefinitions.map((tier) => ({
+                id: tier.id,
+                label: tier.label,
+                count: tierList.albums.filter((album) => album.tier === tier.id).length,
+              }));
+
+              return (
+                <Link
+                  key={tierList.id}
+                  href={`/tier-lists/${tierList.id}`}
+                  className="group flex h-full flex-col rounded-xl border border-gray-800 bg-gray-900/70 p-4 shadow-md transition hover:border-emerald-400/70"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-lg font-semibold text-white group-hover:text-emerald-200">
+                        {tierList.playlistName}
+                      </p>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">
+                        {tierList.playlistOwner}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-gray-700 px-3 py-1 text-[10px] uppercase tracking-wide text-gray-300">
+                      {new Date(tierList.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-4 gap-2">
+                    {artPreview.length === 0 ? (
+                      <div className="col-span-4 flex h-16 items-center justify-center rounded-lg border border-dashed border-gray-700 text-[10px] uppercase tracking-widest text-gray-500">
+                        Tier screenshots pending
+                      </div>
+                    ) : (
+                      artPreview.map((album) => (
+                        <div
+                          key={album.id}
+                          className="relative h-16 w-full overflow-hidden rounded-lg border border-gray-800"
+                        >
+                          <Image
+                            src={album.image!}
+                            alt={album.name}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-400">
+                    {tierCounts.map((tier) => (
+                      <span key={tier.id} className="flex items-center justify-between rounded border border-gray-800 px-2 py-1">
+                        <span className="truncate">{tier.label.split('–')[0].trim()}</span>
+                        <span className="font-semibold text-gray-200">{tier.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

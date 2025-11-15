@@ -7,6 +7,8 @@ import { Menu, X } from 'lucide-react';
 
 const navLinks = [
   { href: '/', label: 'Reviews' },
+  { href: '/tier-maker', label: 'Tier Maker' },
+  { href: '/blog', label: 'Blog' },
   { href: '/review-builder', label: 'Start Your Review' },
 ];
 
