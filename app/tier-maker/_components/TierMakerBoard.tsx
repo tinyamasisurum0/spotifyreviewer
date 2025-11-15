@@ -404,8 +404,8 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
         }, []);
 
         const albumIds = uniqueAlbums
-          .map((album) => album.id ?? '')
-          .filter((albumId) => albumId.length > 0 && !albumId.startsWith('album-'));
+          .map((album: SpotifyAlbum) => album.id ?? '')
+          .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
         if (albumIds.length > 0) {
           try {
             const extraDetails = await getAlbumsDetails(albumIds);
