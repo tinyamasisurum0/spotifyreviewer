@@ -409,7 +409,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
         if (albumIds.length > 0) {
           try {
             const extraDetails = await getAlbumsDetails(albumIds);
-            uniqueAlbums = uniqueAlbums.map((album) => {
+            uniqueAlbums = uniqueAlbums.map((album: SpotifyAlbum) => {
               const details = extraDetails[album.id];
               if (!details) {
                 return album;
@@ -432,7 +432,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
           }
         }
 
-        const mappedAlbums: TierListAlbum[] = uniqueAlbums.map((album) => ({
+        const mappedAlbums: TierListAlbum[] = uniqueAlbums.map((album: SpotifyAlbum) => ({
           id: album.id,
           name: album.name,
           artist: album.artists?.[0]?.name ?? 'Unknown Artist',
