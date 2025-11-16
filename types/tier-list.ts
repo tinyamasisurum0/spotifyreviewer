@@ -1,4 +1,5 @@
 export type TierId = 'unranked' | 's' | 'a' | 'b' | 'c';
+export type RankedTierId = Exclude<TierId, 'unranked'>;
 
 export interface TierListAlbum {
   id: string;
@@ -13,6 +14,15 @@ export interface TierListAlbum {
   tier: TierId;
 }
 
+export interface TierMetadataEntry {
+  title: string;
+  createdBy: string;
+  color: string;
+  textColor: string;
+}
+
+export type TierMetadataMap = Record<RankedTierId, TierMetadataEntry>;
+
 export interface StoredTierList {
   id: string;
   playlistId: string;
@@ -22,6 +32,7 @@ export interface StoredTierList {
   imageDataUrl: string | null;
   createdAt: string;
   albums: TierListAlbum[];
+  tierMetadata: TierMetadataMap;
 }
 
 export interface TierListInput {
@@ -31,4 +42,5 @@ export interface TierListInput {
   playlistImage: string | null;
   imageDataUrl: string | null;
   albums: TierListAlbum[];
+  tierMetadata: TierMetadataMap;
 }

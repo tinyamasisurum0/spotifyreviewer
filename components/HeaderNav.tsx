@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 
 const navLinks = [
+  { href: '/blog', label: 'Blog' },
   { href: '/', label: 'Reviews' },
   { href: '/tier-maker', label: 'Tier Maker' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/review-builder', label: 'Start Your Review' },
+  { href: '/review-builder', label: 'Review Builder' },
 ];
 
 export function HeaderNav() {

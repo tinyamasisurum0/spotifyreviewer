@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addTierList, readTierLists } from '@/lib/tierLists';
 import type { TierId, TierListAlbum } from '@/types/tier-list';
+import { mergeTierMetadata } from '@/data/tierMaker';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
       playlistImage: typeof playlistImage === 'string' ? playlistImage : null,
       imageDataUrl: typeof imageDataUrl === 'string' ? imageDataUrl : null,
       albums,
+      tierMetadata: mergeTierMetadata(payload?.tierMetadata),
     });
 
     return NextResponse.json(tierList, { status: 201 });

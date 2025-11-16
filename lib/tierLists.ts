@@ -1,7 +1,14 @@
 import { randomUUID } from 'crypto';
 import { db } from '@vercel/postgres';
 import type { VercelPoolClient } from '@vercel/postgres';
-import type { StoredTierList, TierId, TierListAlbum, TierListInput } from '@/types/tier-list';
+import type {
+  StoredTierList,
+  TierId,
+  TierListAlbum,
+  TierListInput,
+  TierMetadataMap,
+} from '@/types/tier-list';
+import { createDefaultTierMetadata, mergeTierMetadata } from '@/data/tierMaker';
 
 type TierListRow = {
   tier_list_id: string;
@@ -11,6 +18,7 @@ type TierListRow = {
   playlist_image: string | null;
   image_data_url: string | null;
   created_at: Date | null;
+  tier_metadata: unknown;
   entry_id: string | null;
   album_id: string | null;
   tier: string | null;
@@ -56,7 +64,8 @@ async function ensureSchema() {
             playlist_owner TEXT NOT NULL,
             playlist_image TEXT,
             image_data_url TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            tier_metadata JSONB
           );
         `;
 
@@ -82,6 +91,11 @@ async function ensureSchema() {
           CREATE INDEX IF NOT EXISTS tier_list_albums_list_id_idx
           ON tier_list_albums (tier_list_id, tier, position);
         `;
+
+        await client.sql`
+          ALTER TABLE tier_lists
+          ADD COLUMN IF NOT EXISTS tier_metadata JSONB;
+        `;
       });
     })();
   }
@@ -96,6 +110,20 @@ const normalizeTier = (value: string | null): TierId => {
   return 'unranked';
 };
 
+const parseTierMetadata = (value: unknown): TierMetadataMap => {
+  if (!value) {
+    return mergeTierMetadata(null);
+  }
+  try {
+    if (typeof value === 'string') {
+      return mergeTierMetadata(JSON.parse(value));
+    }
+    return mergeTierMetadata(value as Record<string, unknown>);
+  } catch {
+    return mergeTierMetadata(null);
+  }
+};
+
 function mapRowToTierList(row: TierListRow): StoredTierList {
   return {
     id: row.tier_list_id,
@@ -106,6 +134,7 @@ function mapRowToTierList(row: TierListRow): StoredTierList {
     imageDataUrl: row.image_data_url,
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
     albums: [],
+    tierMetadata: parseTierMetadata(row.tier_metadata),
   };
 }
 
@@ -181,6 +210,7 @@ export async function addTierList(input: TierListInput): Promise<StoredTierList>
 
   const tierListId = randomUUID();
   const createdAt = new Date();
+  const tierMetadata = input.tierMetadata ?? createDefaultTierMetadata();
 
   await withClient(async (client) => {
     await client.sql`BEGIN`;
@@ -194,7 +224,8 @@ export async function addTierList(input: TierListInput): Promise<StoredTierList>
           playlist_owner,
           playlist_image,
           image_data_url,
-          created_at
+          created_at,
+          tier_metadata
         ) VALUES (
           ${tierListId}::uuid,
           ${input.playlistId},
@@ -202,7 +233,8 @@ export async function addTierList(input: TierListInput): Promise<StoredTierList>
           ${input.playlistOwner},
           ${input.playlistImage},
           ${input.imageDataUrl},
-          ${createdAt.toISOString()}::timestamptz
+          ${createdAt.toISOString()}::timestamptz,
+          ${JSON.stringify(tierMetadata)}::jsonb
         );
       `;
 
@@ -257,6 +289,7 @@ export async function addTierList(input: TierListInput): Promise<StoredTierList>
     imageDataUrl: input.imageDataUrl,
     createdAt: createdAt.toISOString(),
     albums: input.albums.map((album) => ({ ...album })),
+    tierMetadata,
   };
 }
 
@@ -273,6 +306,7 @@ export async function getTierListById(id: string): Promise<StoredTierList | null
         l.playlist_image,
         l.image_data_url,
         l.created_at,
+        l.tier_metadata,
         a.id           AS entry_id,
         a.album_id,
         a.tier,

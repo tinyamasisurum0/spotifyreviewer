@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
 import { readTierLists } from '@/lib/tierLists';
-import { tierDefinitions } from '@/data/tierMaker';
+import { tierDefinitions, mergeTierMetadata } from '@/data/tierMaker';
 
 export const dynamic = 'force-dynamic';
 
@@ -133,20 +133,20 @@ export default async function ReviewsPage() {
       )}
 
       <section id="tier-lists" className="mt-16 space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-white">Shared Tier Lists</h2>
-            <p className="text-sm text-gray-400">
-              Playlist curators dragging their albums into S → C lanes.
-            </p>
-          </div>
+        <div className="flex justify-center">
           <Link
             href="/tier-maker"
-            className="inline-flex min-w-[200px] items-center justify-center rounded-xl border border-emerald-400 bg-gray-900/60 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-md transition hover:border-emerald-300 hover:text-emerald-100"
+            className="inline-flex min-w-[220px] items-center justify-center rounded-xl border border-emerald-400 bg-gray-900/60 px-6 py-3 text-base font-semibold text-emerald-200 shadow-md transition hover:border-emerald-300 hover:text-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
           >
             Launch Tier Maker
           </Link>
         </div>
+        <header className="text-left">
+          <h2 className="text-2xl font-semibold text-white">Shared Tier Lists</h2>
+          <p className="text-sm text-gray-400">
+            Playlist curators dragging their albums into S → C lanes.
+          </p>
+        </header>
         {sortedTierLists.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-700 bg-gray-800/70 p-8 text-center text-gray-400">
             Tier maker saves will show up here once someone shares their board.
@@ -154,12 +154,13 @@ export default async function ReviewsPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {sortedTierLists.map((tierList) => {
+              const tierMetadata = mergeTierMetadata(tierList.tierMetadata);
               const artPreview = tierList.albums
                 .filter((album) => album.tier !== 'unranked' && album.image)
                 .slice(0, 4);
               const tierCounts = tierDefinitions.map((tier) => ({
                 id: tier.id,
-                label: tier.label,
+                label: tierMetadata[tier.id]?.title ?? tier.label,
                 count: tierList.albums.filter((album) => album.tier === tier.id).length,
               }));
 
@@ -207,7 +208,9 @@ export default async function ReviewsPage() {
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-400">
                     {tierCounts.map((tier) => (
                       <span key={tier.id} className="flex items-center justify-between rounded border border-gray-800 px-2 py-1">
-                        <span className="truncate">{tier.label.split('–')[0].trim()}</span>
+                        <span className="truncate">
+                          {tier.label.includes('–') ? tier.label.split('–')[0].trim() : tier.label}
+                        </span>
                         <span className="font-semibold text-gray-200">{tier.count}</span>
                       </span>
                     ))}

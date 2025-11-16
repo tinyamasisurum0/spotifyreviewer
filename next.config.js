@@ -1,7 +1,16 @@
 module.exports = {
   images: {
-    domains: ['i.scdn.co', 'mosaic.scdn.co'],
     formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.scdn.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'mosaic.scdn.co',
+      },
+    ],
   },
   async headers() {
     return [

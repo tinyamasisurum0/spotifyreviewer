@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
-import { tierDefinitions } from '@/data/tierMaker';
+import { tierDefinitions, mergeTierMetadata } from '@/data/tierMaker';
 import { tierPalette, defaultTierPalette } from '@/data/tierPalette';
 import type { StoredTierList, TierId, TierListAlbum } from '@/types/tier-list';
 
@@ -30,6 +30,30 @@ const buildTierGroups = (albums: TierListAlbum[]) => {
   }
 
   return groups;
+};
+
+const hexToRgba = (hex: string, alpha: number, fallback: string): string => {
+  if (!hex) {
+    return fallback;
+  }
+  let normalized = hex.replace('#', '');
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split('')
+      .map((char) => char + char)
+      .join('');
+  }
+  if (normalized.length !== 6) {
+    return fallback;
+  }
+  const bigint = Number.parseInt(normalized, 16);
+  if (Number.isNaN(bigint)) {
+    return fallback;
+  }
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 function TierAlbumTileStatic({ album, hideDecorations }: { album: TierListAlbum; hideDecorations: boolean }) {
@@ -81,6 +105,7 @@ function TierAlbumTileStatic({ album, hideDecorations }: { album: TierListAlbum;
 
 export default function TierListDetailClient({ tierList }: TierListDetailClientProps) {
   const tierGroups = useMemo(() => buildTierGroups(tierList.albums), [tierList.albums]);
+  const tierMetadata = useMemo(() => mergeTierMetadata(tierList.tierMetadata), [tierList.tierMetadata]);
   const boardRef = useRef<HTMLDivElement>(null);
   const [hideDecorations, setHideDecorations] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -176,13 +201,34 @@ export default function TierListDetailClient({ tierList }: TierListDetailClientP
         <div className="space-y-4">
           {tierDefinitions.map((tier) => {
             const palette = tierPalette[tier.id as keyof typeof tierPalette] ?? defaultTierPalette;
-            const panelBg = hideDecorations ? '#0f172a' : palette.panel;
+            const metadata = tierMetadata[tier.id];
+            const customColor = metadata?.color;
+            const panelBg = customColor ?? (hideDecorations ? '#0f172a' : palette.panel);
             const panelBorder = hideDecorations ? '#374151' : palette.border;
-            const textColor = hideDecorations ? '#e5e7eb' : palette.text;
-            const subTextColor = hideDecorations ? '#9ca3af' : palette.subtext;
+            const textColorValue = metadata?.textColor;
+            const textColor = hideDecorations
+              ? '#e5e7eb'
+              : textColorValue ?? palette.text;
+            const subTextColor = hideDecorations
+              ? '#9ca3af'
+              : textColorValue
+                ? hexToRgba(textColorValue, 0.75, palette.subtext)
+                : palette.subtext;
             const badgeStyle = hideDecorations
               ? { border: '1px solid #4b5563', color: '#d1d5db', backgroundColor: 'transparent' }
               : { backgroundColor: palette.badgeBg, color: palette.badgeText };
+            const displayTitle = metadata?.title?.trim().length ? metadata.title : tier.label;
+            const displayCreator =
+              metadata?.createdBy?.trim().length ? metadata.createdBy : tier.subheading;
+            const laneBackground = customColor
+              ? hexToRgba(
+                  customColor,
+                  hideDecorations ? 0.18 : 0.35,
+                  hideDecorations ? 'transparent' : palette.lane
+                )
+              : hideDecorations
+                ? 'transparent'
+                : palette.lane;
 
             return (
               <article
@@ -191,21 +237,30 @@ export default function TierListDetailClient({ tierList }: TierListDetailClientP
                 style={{ backgroundColor: panelBg, border: `1px solid ${panelBorder}` }}
               >
                 <div className="mb-4 flex items-center justify-between" style={{ color: textColor }}>
-                  <div>
-                    <p className="text-xl font-black uppercase tracking-wide">{tier.label}</p>
+                  <div className="space-y-2">
+                    <p className="text-xl font-black uppercase tracking-wide">{displayTitle}</p>
                     <p className="text-sm" style={{ color: subTextColor }}>
-                      {tier.subheading}
+                      {displayCreator}
                     </p>
                   </div>
                   <span className="rounded-full px-3 py-1 text-xs font-semibold" style={badgeStyle}>
                     {tierGroups[tier.id].length} albums
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <div
+                  className="grid grid-cols-2 gap-3 rounded-2xl px-4 py-4 sm:grid-cols-3 lg:grid-cols-4"
+                  style={{
+                    backgroundColor: laneBackground,
+                  }}
+                >
                   {tierGroups[tier.id].length === 0 ? (
                     <p
                       className="rounded-xl border border-dashed px-3 py-6 text-center text-sm"
-                      style={{ borderColor: panelBorder, color: subTextColor, backgroundColor: hideDecorations ? 'transparent' : palette.lane }}
+                      style={{
+                        borderColor: panelBorder,
+                        color: subTextColor,
+                        backgroundColor: laneBackground,
+                      }}
                     >
                       Nothing in this lane yet.
                     </p>

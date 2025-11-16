@@ -21,9 +21,15 @@ import { CSS } from '@dnd-kit/utilities';
 import { ExternalLink } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import { getAlbumsDetails, getPlaylistDetails, getPlaylistTracks } from '@/utils/spotifyApi';
-import { tierDefinitions, unrankedDefinition } from '@/data/tierMaker';
+import {
+  tierDefinitions,
+  unrankedDefinition,
+  createDefaultTierMetadata,
+  tierColorChoices,
+  tierTextColorChoices,
+} from '@/data/tierMaker';
 import { tierPalette as sharedTierPalette, defaultTierPalette } from '@/data/tierPalette';
-import type { TierId, TierListAlbum } from '@/types/tier-list';
+import type { RankedTierId, TierId, TierListAlbum, TierMetadataMap } from '@/types/tier-list';
 
 type SpotifyAlbum = {
   id: string;
@@ -60,49 +66,174 @@ const createEmptyTierState = (): TierState => ({
   c: [],
 });
 
+const hexToRgba = (hex: string, alpha: number, fallback: string): string => {
+  if (!hex) {
+    return fallback;
+  }
+  let normalized = hex.replace('#', '');
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split('')
+      .map((char) => char + char)
+      .join('');
+  }
+  if (normalized.length !== 6) {
+    return fallback;
+  }
+  const bigint = Number.parseInt(normalized, 16);
+  if (Number.isNaN(bigint)) {
+    return fallback;
+  }
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+
 function TierRow({
   tier,
   albums,
   hideDecorations,
+  metadata,
+  onMetadataChange,
+  hideColorControls,
 }: {
   tier: (typeof tierDefinitions)[number];
   albums: TierListAlbum[];
   hideDecorations: boolean;
+  metadata: TierMetadataMap[RankedTierId];
+  onMetadataChange: (next: TierMetadataMap[RankedTierId]) => void;
+  hideColorControls?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: tier.id });
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
   const palette =
     sharedTierPalette[tier.id as keyof typeof sharedTierPalette] ?? defaultTierPalette;
-  const backgroundColor = hideDecorations ? '#0f172a' : palette.panel;
+  const customColor = tierColorChoices.includes(metadata.color) ? metadata.color : null;
+  const customTextColor = tierTextColorChoices.includes(metadata.textColor) ? metadata.textColor : null;
+  const backgroundColor = customColor ?? (hideDecorations ? '#0f172a' : palette.panel);
   const borderColor = hideDecorations ? '#374151' : palette.border;
-  const textColor = hideDecorations ? '#e5e7eb' : palette.text;
-  const subTextColor = hideDecorations ? '#9ca3af' : palette.subtext;
-  const badgeStyles = hideDecorations
-    ? { border: '1px solid #4b5563', color: '#d1d5db', backgroundColor: 'transparent' }
-    : { backgroundColor: palette.badgeBg, color: palette.badgeText };
-  const laneBackground = hideDecorations ? 'transparent' : palette.lane;
-  const laneRing = hideDecorations ? '2px solid rgba(16,185,129,0.4)' : `2px solid ${palette.border}`;
+  const textColor = hideDecorations ? '#e5e7eb' : customTextColor ?? palette.text;
+  const subTextColor = hideDecorations
+    ? '#9ca3af'
+    : customTextColor
+      ? hexToRgba(customTextColor, 0.75, palette.subtext)
+      : palette.subtext;
+  const laneBackground = customColor
+    ? hexToRgba(customColor, hideDecorations ? 0.18 : 0.35, hideDecorations ? 'transparent' : palette.lane)
+    : hideDecorations
+      ? 'transparent'
+      : palette.lane;
+  const laneRing = customColor
+    ? `2px solid ${customColor}`
+    : hideDecorations
+      ? '2px solid rgba(16,185,129,0.4)'
+      : `2px solid ${palette.border}`;
+
+  useEffect(() => {
+    if (!showColorPicker) {
+      return;
+    }
+    const handleClick = (event: MouseEvent) => {
+      if (!colorPickerRef.current) {
+        return;
+      }
+      if (!colorPickerRef.current.contains(event.target as Node)) {
+        setShowColorPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [showColorPicker]);
+
+  const handleColorChange = (color: string) => {
+    onMetadataChange({ ...metadata, color });
+    setShowColorPicker(false);
+  };
+
+  const handleTextColorChange = (color: string) => {
+    onMetadataChange({ ...metadata, textColor: color });
+  };
 
   return (
     <section
-      className="rounded-2xl"
+      className="relative rounded-2xl"
       style={{ backgroundColor, border: `1px solid ${borderColor}` }}
     >
+      {!hideColorControls && (
+        <div ref={colorPickerRef} className="absolute right-4 top-4">
+          <button
+            type="button"
+            onClick={() => setShowColorPicker((prev) => !prev)}
+            className="relative h-8 w-8 rounded-full border border-white/70 bg-gradient-to-br from-rose-500 via-amber-300 to-emerald-400 shadow-lg shadow-black/30 transition hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          >
+            <span className="sr-only">Change {tier.label} color</span>
+          </button>
+          {showColorPicker && (
+            <div className="absolute right-0 top-10 z-20 w-56 rounded-2xl border border-gray-700 bg-gray-900/95 p-4 shadow-xl shadow-black/40">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
+                Background
+              </p>
+              <div className="grid grid-cols-5 gap-3">
+                {tierColorChoices.map((color) => (
+                  <button
+                    type="button"
+                    key={color}
+                    className={`h-8 w-8 rounded-full border-2 transition ${
+                      customColor === color ? 'border-white' : 'border-transparent hover:border-white/60'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => handleColorChange(color)}
+                    aria-label={`Set ${tier.label} color to ${color}`}
+                  />
+                ))}
+              </div>
+              <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
+                Text Color
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {tierTextColorChoices.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => handleTextColorChange(color)}
+                    className={`h-10 w-10 rounded-full border ${
+                      customTextColor === color ? 'border-white' : 'border-white/30'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    aria-label={`Set ${tier.label} text color`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div
-        className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
+        className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 pr-16"
         style={{ borderColor, color: textColor }}
       >
-        <div>
-          <p className="text-xl font-black uppercase tracking-wide">{tier.label}</p>
-          <p className="text-sm" style={{ color: subTextColor }}>
-            {tier.subheading}
-          </p>
+        <div className="space-y-2">
+          <EditableText
+            value={metadata.title}
+            onChange={(value) => onMetadataChange({ ...metadata, title: value })}
+            className="block text-xl font-black uppercase tracking-wide"
+            placeholder={tier.label}
+            ariaLabel={`Edit ${tier.label} tier title`}
+          />
+          <EditableText
+            value={metadata.createdBy}
+            onChange={(value) => onMetadataChange({ ...metadata, createdBy: value })}
+            className="block text-sm"
+            placeholder="Add the curator or vibe"
+            ariaLabel={`Edit created by for ${tier.label}`}
+          />
         </div>
-        <span
-          className="rounded-full px-3 py-1 text-xs font-semibold"
-          style={badgeStyles}
-        >
-          {albums.length} album{albums.length === 1 ? '' : 's'}
-        </span>
+        <div className="h-6" />
       </div>
       <div
         ref={setNodeRef}
@@ -116,7 +247,8 @@ function TierRow({
         <SortableContext items={albums.map((album) => album.id)} strategy={rectSortingStrategy}>
           {albums.length === 0 ? (
             <p className="text-sm" style={{ color: subTextColor }}>
-              Drag albums here to mark them {tier.label.split('–')[0].trim()}.
+              Drag albums here to mark them{' '}
+              {(metadata.title.trim() || tier.label).split('–')[0].trim()}.
             </p>
           ) : (
             albums.map((album) => (
@@ -351,6 +483,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
   const [playlistOwner, setPlaylistOwner] = useState('');
   const [playlistImage, setPlaylistImage] = useState<string | null>(null);
   const [tiers, setTiers] = useState<TierState>(() => createEmptyTierState());
+  const [tierMetadata, setTierMetadata] = useState<TierMetadataMap>(() => createDefaultTierMetadata());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hideDecorations, setHideDecorations] = useState(false);
@@ -452,6 +585,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
           b: [],
           c: [],
         });
+        setTierMetadata(createDefaultTierMetadata());
       } catch {
         if (!isCancelled) {
           setError('Unable to fetch playlist data. Double-check the link and try again.');
@@ -615,6 +749,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
           playlistOwner,
           playlistImage,
           imageDataUrl: imageUrl,
+          tierMetadata,
           albums: flattenedAlbums.map((album) => ({
             id: album.id,
             name: album.name,
@@ -709,7 +844,11 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
         </div>
 
         <DndContext sensors={sensors} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-          <div className="space-y-6 lg:grid lg:grid-cols-[2fr_minmax(280px,1fr)] lg:gap-6 lg:space-y-0">
+          <div
+            className={`space-y-6 lg:grid ${
+              isPreparingDownload ? 'lg:grid-cols-1' : 'lg:grid-cols-[2fr_minmax(280px,1fr)]'
+            } lg:gap-6 lg:space-y-0`}
+          >
             <div className="space-y-4 lg:order-1">
               {tierDefinitions.map((tier) => (
                 <TierRow
@@ -717,12 +856,31 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
                   tier={tier}
                   albums={tiers[tier.id]}
                   hideDecorations={hideDecorations}
+                  metadata={
+                    tierMetadata[tier.id] ?? {
+                      title: tier.label,
+                      createdBy: tier.subheading,
+                      color:
+                        sharedTierPalette[tier.id as keyof typeof sharedTierPalette]?.panel ?? '#0f172a',
+                      textColor:
+                        sharedTierPalette[tier.id as keyof typeof sharedTierPalette]?.text ?? '#f8fafc',
+                    }
+                  }
+                  onMetadataChange={(next) =>
+                    setTierMetadata((prev) => ({
+                      ...prev,
+                      [tier.id]: next,
+                    }))
+                  }
+                  hideColorControls={isPreparingDownload}
                 />
               ))}
             </div>
-            <div className="lg:order-2 lg:sticky lg:top-6 self-start">
-              <UnrankedGrid albums={tiers.unranked} hideDecorations={hideDecorations} />
-            </div>
+            {!isPreparingDownload && (
+              <div className="lg:order-2 lg:sticky lg:top-6 self-start">
+                <UnrankedGrid albums={tiers.unranked} hideDecorations={hideDecorations} />
+              </div>
+            )}
           </div>
         </DndContext>
       </div>
