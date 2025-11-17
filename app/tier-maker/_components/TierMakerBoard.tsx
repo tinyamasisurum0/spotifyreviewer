@@ -94,14 +94,12 @@ const hexToRgba = (hex: string, alpha: number, fallback: string): string => {
 function TierRow({
   tier,
   albums,
-  hideDecorations,
   metadata,
   onMetadataChange,
   hideColorControls,
 }: {
   tier: (typeof tierDefinitions)[number];
   albums: TierListAlbum[];
-  hideDecorations: boolean;
   metadata: TierMetadataMap[RankedTierId];
   onMetadataChange: (next: TierMetadataMap[RankedTierId]) => void;
   hideColorControls?: boolean;
@@ -113,24 +111,18 @@ function TierRow({
     sharedTierPalette[tier.id as keyof typeof sharedTierPalette] ?? defaultTierPalette;
   const customColor = tierColorChoices.includes(metadata.color) ? metadata.color : null;
   const customTextColor = tierTextColorChoices.includes(metadata.textColor) ? metadata.textColor : null;
-  const backgroundColor = customColor ?? (hideDecorations ? '#0f172a' : palette.panel);
-  const borderColor = hideDecorations ? '#374151' : palette.border;
-  const textColor = hideDecorations ? '#e5e7eb' : customTextColor ?? palette.text;
-  const subTextColor = hideDecorations
-    ? '#9ca3af'
-    : customTextColor
-      ? hexToRgba(customTextColor, 0.75, palette.subtext)
-      : palette.subtext;
+  const backgroundColor = customColor ?? palette.panel;
+  const borderColor = palette.border;
+  const textColor = customTextColor ?? palette.text;
+  const subTextColor = customTextColor
+    ? hexToRgba(customTextColor, 0.75, palette.subtext)
+    : palette.subtext;
   const laneBackground = customColor
-    ? hexToRgba(customColor, hideDecorations ? 0.18 : 0.35, hideDecorations ? 'transparent' : palette.lane)
-    : hideDecorations
-      ? 'transparent'
-      : palette.lane;
+    ? hexToRgba(customColor, 0.35, palette.lane)
+    : palette.lane;
   const laneRing = customColor
     ? `2px solid ${customColor}`
-    : hideDecorations
-      ? '2px solid rgba(16,185,129,0.4)'
-      : `2px solid ${palette.border}`;
+    : `2px solid ${palette.border}`;
 
   useEffect(() => {
     if (!showColorPicker) {
@@ -157,6 +149,15 @@ function TierRow({
 
   const handleTextColorChange = (color: string) => {
     onMetadataChange({ ...metadata, textColor: color });
+  };
+
+  const handleResetColors = () => {
+    onMetadataChange({
+      ...metadata,
+      color: palette.panel,
+      textColor: palette.text,
+    });
+    setShowColorPicker(false);
   };
 
   return (
@@ -209,6 +210,13 @@ function TierRow({
                   />
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={handleResetColors}
+                className="mt-4 w-full rounded-lg border border-gray-700 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-200 transition hover:border-emerald-400"
+              >
+                Reset to defaults
+              </button>
             </div>
           )}
         </div>
@@ -252,12 +260,7 @@ function TierRow({
             </p>
           ) : (
             albums.map((album) => (
-              <TierAlbumTile
-                key={album.id}
-                album={{ ...album, tier: tier.id }}
-                variant="tier"
-                hideDecorations={hideDecorations}
-              />
+              <TierAlbumTile key={album.id} album={{ ...album, tier: tier.id }} variant="tier" />
             ))
           )}
         </SortableContext>
@@ -266,13 +269,7 @@ function TierRow({
   );
 }
 
-function UnrankedGrid({
-  albums,
-  hideDecorations,
-}: {
-  albums: TierListAlbum[];
-  hideDecorations: boolean;
-}) {
+function UnrankedGrid({ albums }: { albums: TierListAlbum[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unranked' });
 
   return (
@@ -300,9 +297,7 @@ function UnrankedGrid({
               Drop any album here to keep it off the tier board for now.
             </div>
           ) : (
-            albums.map((album) => (
-              <TierAlbumTile key={album.id} album={album} variant="bench" hideDecorations={hideDecorations} />
-            ))
+            albums.map((album) => <TierAlbumTile key={album.id} album={album} variant="bench" />)
           )}
         </SortableContext>
       </div>
@@ -397,15 +392,7 @@ function EditableText({
   );
 }
 
-function TierAlbumTile({
-  album,
-  variant,
-  hideDecorations,
-}: {
-  album: TierListAlbum;
-  variant: 'bench' | 'tier';
-  hideDecorations: boolean;
-}) {
+function TierAlbumTile({ album, variant }: { album: TierListAlbum; variant: 'bench' | 'tier' }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: album.id,
   });
@@ -468,11 +455,9 @@ function TierAlbumTile({
         <p className="truncate text-sm font-semibold text-white">{album.name}</p>
         <p className="truncate text-xs text-gray-400">{album.artist}</p>
         <p className="text-xs text-gray-500">Released {releaseDate}</p>
-        {!hideDecorations && (
-          <p className="truncate text-[11px] uppercase tracking-wide text-gray-500">
-            {album.label ?? 'No label credit'}
-          </p>
-        )}
+        <p className="truncate text-[11px] uppercase tracking-wide text-gray-500">
+          {album.label ?? 'No label credit'}
+        </p>
       </div>
     </div>
   );
@@ -486,7 +471,6 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
   const [tierMetadata, setTierMetadata] = useState<TierMetadataMap>(() => createDefaultTierMetadata());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hideDecorations, setHideDecorations] = useState(false);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -796,18 +780,6 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
-        <label className="inline-flex items-center gap-2 text-sm text-gray-300">
-          <input
-            type="checkbox"
-            checked={hideDecorations}
-            onChange={(event) => setHideDecorations(event.target.checked)}
-            className="h-4 w-4 rounded border-gray-700 bg-gray-900 text-emerald-500 focus:ring-emerald-400"
-          />
-          <span>Hide tier gradients & decorations</span>
-        </label>
-      </div>
-
       <div
         ref={boardRef}
         className="rounded-3xl border border-gray-800 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 p-5 shadow-xl shadow-black/40"
@@ -855,7 +827,6 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
                   key={tier.id}
                   tier={tier}
                   albums={tiers[tier.id]}
-                  hideDecorations={hideDecorations}
                   metadata={
                     tierMetadata[tier.id] ?? {
                       title: tier.label,
@@ -878,7 +849,7 @@ export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
             </div>
             {!isPreparingDownload && (
               <div className="lg:order-2 lg:sticky lg:top-6 self-start">
-                <UnrankedGrid albums={tiers.unranked} hideDecorations={hideDecorations} />
+                <UnrankedGrid albums={tiers.unranked} />
               </div>
             )}
           </div>

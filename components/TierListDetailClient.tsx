@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Share2 } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import { tierDefinitions, mergeTierMetadata } from '@/data/tierMaker';
 import { tierPalette, defaultTierPalette } from '@/data/tierPalette';
@@ -107,9 +107,33 @@ export default function TierListDetailClient({ tierList }: TierListDetailClientP
   const tierGroups = useMemo(() => buildTierGroups(tierList.albums), [tierList.albums]);
   const tierMetadata = useMemo(() => mergeTierMetadata(tierList.tierMetadata), [tierList.tierMetadata]);
   const boardRef = useRef<HTMLDivElement>(null);
-  const [hideDecorations, setHideDecorations] = useState(false);
+  const hideDecorations = false;
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [copyFeedback, setCopyFeedback] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setShareUrl(window.location.href);
+  }, []);
+
+  useEffect(() => {
+    if (!showShareMenu) {
+      return;
+    }
+    const handleClickOutside = (event: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
+        setShowShareMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showShareMenu]);
 
   const handleDownload = async () => {
     if (!boardRef.current || isDownloading) {
@@ -137,6 +161,25 @@ export default function TierListDetailClient({ tierList }: TierListDetailClientP
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleCopyLink = async () => {
+    const targetUrl = shareUrl || window.location.href;
+    try {
+      await navigator.clipboard.writeText(targetUrl);
+      setCopyFeedback('copied');
+      setCopyError(null);
+      setTimeout(() => setCopyFeedback('idle'), 2000);
+    } catch {
+      setCopyFeedback('error');
+      setCopyError('Unable to copy the link. Select and copy it manually.');
+    }
+  };
+
+  const handleShareToggle = () => {
+    setShowShareMenu((prev) => !prev);
+    setCopyFeedback('idle');
+    setCopyError(null);
   };
 
   return (
@@ -178,20 +221,46 @@ export default function TierListDetailClient({ tierList }: TierListDetailClientP
             >
               {isDownloading ? 'Preparing…' : 'Download JPEG'}
             </button>
+            <div className="relative" ref={shareMenuRef}>
+              <button
+                type="button"
+                onClick={handleShareToggle}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-200 transition hover:border-gray-500 hover:bg-gray-800"
+                aria-label="Share this tier list"
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+              {showShareMenu && (
+                <div className="absolute right-0 z-30 mt-2 w-64 rounded-md border border-gray-700 bg-gray-900 p-4 shadow-lg">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Share link</p>
+                  <p className="mt-1 text-sm text-gray-300">Copy this URL to share the tier board.</p>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareUrl}
+                      onFocus={(event) => event.currentTarget.select()}
+                      className="flex-1 rounded-md border border-gray-700 bg-gray-950 px-2 py-1 text-xs text-gray-200 focus:border-emerald-400 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="rounded-md border border-gray-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-100 transition hover:border-emerald-400"
+                    >
+                      {copyFeedback === 'copied' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  {copyError && <p className="mt-2 text-xs text-red-400">{copyError}</p>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-sm text-gray-300">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={hideDecorations}
-              onChange={(event) => setHideDecorations(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-700 bg-gray-900 text-emerald-500 focus:ring-emerald-400"
-            />
-            <span>Hide decorations</span>
-          </label>
-          {downloadError && <span className="text-red-400">{downloadError}</span>}
-        </div>
+        {downloadError && (
+          <div className="mt-4 text-sm text-red-400">
+            {downloadError}
+          </div>
+        )}
       </header>
 
       <section

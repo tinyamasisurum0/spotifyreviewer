@@ -86,6 +86,13 @@ export default function BlogPage() {
             className="ml-1 text-emerald-200 underline decoration-emerald-500/60 decoration-2 underline-offset-4 hover:text-emerald-100"
           >
             review builder
+          </Link>{' '}
+          and the{' '}
+          <Link
+            href="/tier-maker"
+            className="text-emerald-200 underline decoration-emerald-500/60 decoration-2 underline-offset-4 hover:text-emerald-100"
+          >
+            tier maker
           </Link>
           . Everything below maps to the existing tools, so you can recreate the process on your own
           playlists.
@@ -120,7 +127,14 @@ export default function BlogPage() {
           <h2 className="text-2xl font-semibold text-white">Structure Your Album Tier List</h2>
           <p className="text-sm text-gray-400">
             Once your playlist is loaded, use the existing controls to communicate tiers without any
-            extra tooling.
+            extra tooling, or jump into the{' '}
+            <Link
+              href="/tier-maker"
+              className="text-emerald-200 underline decoration-emerald-500/60 decoration-2 underline-offset-4 hover:text-emerald-100"
+            >
+              dedicated tier maker
+            </Link>{' '}
+            for a board-style layout.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -139,14 +153,22 @@ export default function BlogPage() {
           <p className="mt-2 text-sm text-gray-300">
             Paste a playlist, rearrange the albums, toggle the layout, and export a high-resolution
             collage or link to the hosted review. That&apos;s all you need to present your best
-            albums 2025 tier list.
+            albums 2025 tier list using either workflow.
           </p>
-          <Link
-            href="/review-builder"
-            className="mt-4 inline-flex items-center justify-center rounded-lg border border-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
-          >
-            Create a Playlist Review
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/review-builder"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-400 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+            >
+              Create a Playlist Review
+            </Link>
+            <Link
+              href="/tier-maker"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-400/60 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+            >
+              Open Tier Maker
+            </Link>
+          </div>
         </div>
       </section>
     </div>
