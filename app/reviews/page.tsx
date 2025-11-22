@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { readReviews } from '@/lib/reviews';
 import { readTierLists } from '@/lib/tierLists';
 import { tierDefinitions, mergeTierMetadata } from '@/data/tierMaker';
+import type { StoredReview } from '@/types/review';
+import type { StoredTierList } from '@/types/tier-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +46,16 @@ const formatDate = (iso: string) => {
 };
 
 export default async function ReviewsPage() {
-  const [reviews, tierLists] = await Promise.all([readReviews(), readTierLists()]);
+  let reviews: StoredReview[] = [];
+  let tierLists: StoredTierList[] = [];
+  let loadError = false;
+
+  try {
+    [reviews, tierLists] = await Promise.all([readReviews(), readTierLists()]);
+  } catch (error) {
+    console.error('Failed to load reviews/tier lists', error);
+    loadError = true;
+  }
   const sorted = [...reviews].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -54,6 +65,11 @@ export default async function ReviewsPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl bg-gray-900 px-4 py-10 text-gray-100 sm:px-6 lg:px-10">
+      {loadError && (
+        <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+          Unable to reach the database right now. Showing an empty feed until the connection is restored.
+        </div>
+      )}
       <div className="mb-8 flex justify-center">
         <Link
           href="/review-builder"
