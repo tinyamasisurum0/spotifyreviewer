@@ -123,58 +123,53 @@ function mapRowToReview(row: ReviewRow): StoredReview {
 }
 
 export async function readReviews(): Promise<StoredReview[]> {
-  try {
-    await ensureSchema();
+  await ensureSchema();
 
-    const rows = await withClient(async (client) => {
-      const { rows } = await client.sql<ReviewRow>`
-        SELECT
-          r.id          AS review_id,
-          r.playlist_id,
-          r.playlist_name,
-          r.playlist_owner,
-          r.playlist_image,
-          r.image_data_url,
-          r.review_mode,
-          r.created_at,
-          a.id          AS album_row_id,
-          a.album_id,
-          a.position,
-          a.name        AS album_name,
-          a.artist,
-          a.image       AS album_image,
-          a.release_date,
-          a.label,
-          a.notes,
-          a.rating,
-          a.spotify_url
-        FROM reviews r
-        LEFT JOIN review_albums a ON a.review_id = r.id
-        ORDER BY r.created_at DESC, a.position ASC;
-      `;
-      return rows;
-    });
+  const rows = await withClient(async (client) => {
+    const { rows } = await client.sql<ReviewRow>`
+      SELECT
+        r.id          AS review_id,
+        r.playlist_id,
+        r.playlist_name,
+        r.playlist_owner,
+        r.playlist_image,
+        r.image_data_url,
+        r.review_mode,
+        r.created_at,
+        a.id          AS album_row_id,
+        a.album_id,
+        a.position,
+        a.name        AS album_name,
+        a.artist,
+        a.image       AS album_image,
+        a.release_date,
+        a.label,
+        a.notes,
+        a.rating,
+        a.spotify_url
+      FROM reviews r
+      LEFT JOIN review_albums a ON a.review_id = r.id
+      ORDER BY r.created_at DESC, a.position ASC;
+    `;
+    return rows;
+  });
 
-    const grouped = new Map<string, StoredReview>();
+  const grouped = new Map<string, StoredReview>();
 
-    for (const row of rows) {
-      let review = grouped.get(row.review_id);
-      if (!review) {
-        review = mapRowToReview(row);
-        grouped.set(row.review_id, review);
-      }
-
-      const album = mapRowToAlbum(row);
-      if (album) {
-        review.albums.push(album);
-      }
+  for (const row of rows) {
+    let review = grouped.get(row.review_id);
+    if (!review) {
+      review = mapRowToReview(row);
+      grouped.set(row.review_id, review);
     }
 
-    return Array.from(grouped.values());
-  } catch (error) {
-    console.error('Failed to read reviews; returning empty list.', error);
-    return [];
+    const album = mapRowToAlbum(row);
+    if (album) {
+      review.albums.push(album);
+    }
   }
+
+  return Array.from(grouped.values());
 }
 
 export async function addReview(input: ReviewInput): Promise<StoredReview> {

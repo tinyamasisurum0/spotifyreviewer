@@ -63,16 +63,6 @@ type SpotifyAlbumDetail = {
   external_urls?: { spotify?: string };
 };
 
-export type SpotifyAlbumSearchResult = {
-  id: string;
-  name: string;
-  artists: string[];
-  image: string | null;
-  releaseDate: string;
-  spotifyUrl: string | null;
-  totalTracks: number | null;
-};
-
 export async function getAlbumsDetails(ids: string[]): Promise<Record<string, SpotifyAlbumDetail>> {
   const uniqueIds = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.trim().length > 0)));
   if (uniqueIds.length === 0) {
@@ -114,44 +104,6 @@ export async function getAlbumsDetails(ids: string[]): Promise<Record<string, Sp
   }
 
   return result;
-}
-
-export async function searchAlbums(query: string, limit = 12): Promise<SpotifyAlbumSearchResult[]> {
-  if (!query.trim()) {
-    return [];
-  }
-
-  try {
-    const token = await getAccessToken();
-    const response = await axios.get(`${SPOTIFY_BASE_URL}/search`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: {
-        q: query,
-        type: 'album',
-        limit,
-      },
-    });
-
-    const albums = Array.isArray(response.data?.albums?.items) ? response.data.albums.items : [];
-
-    return albums.map((album: any) => ({
-      id: album.id ?? crypto.randomUUID(),
-      name: album.name ?? 'Unknown album',
-      artists: Array.isArray(album.artists) ? album.artists.map((artist: any) => artist?.name).filter(Boolean) : [],
-      image:
-        Array.isArray(album.images) && album.images.length > 0
-          ? album.images.sort((a: any, b: any) => (b?.height ?? 0) - (a?.height ?? 0))[0]?.url ?? null
-          : null,
-      releaseDate: album.release_date ?? '',
-      spotifyUrl: album.external_urls?.spotify ?? null,
-      totalTracks: typeof album.total_tracks === 'number' ? album.total_tracks : null,
-    }));
-  } catch (error) {
-    console.error('Error searching albums:', error);
-    throw error;
-  }
 }
 
 export async function getPlaylistDetails(playlistId: string) {

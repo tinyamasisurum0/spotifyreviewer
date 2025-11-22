@@ -6,7 +6,6 @@ import {
   DndContext,
   DragEndEvent,
   DragOverEvent,
-  useDraggable,
   PointerSensor,
   useDroppable,
   useSensor,
@@ -19,14 +18,9 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, Loader2, Search } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
-import {
-  getAlbumsDetails,
-  getPlaylistDetails,
-  getPlaylistTracks,
-  type SpotifyAlbumSearchResult,
-} from '@/utils/spotifyApi';
+import { getAlbumsDetails, getPlaylistDetails, getPlaylistTracks } from '@/utils/spotifyApi';
 import {
   tierDefinitions,
   unrankedDefinition,
@@ -54,8 +48,7 @@ type SpotifyTrack = {
 };
 
 type TierMakerBoardProps = {
-  playlistId?: string;
-  manualMode?: boolean;
+  playlistId: string;
 };
 
 const sanitizeLabel = (value?: string | null) =>
@@ -64,10 +57,6 @@ const sanitizeLabel = (value?: string | null) =>
 const tierOrder: TierId[] = ['s', 'a', 'b', 'c'];
 
 type TierState = Record<TierId, TierListAlbum[]>;
-type DragData = {
-  fromSearch?: boolean;
-  album?: SpotifyAlbumSearchResult;
-};
 
 const createEmptyTierState = (): TierState => ({
   unranked: [],
@@ -280,72 +269,7 @@ function TierRow({
   );
 }
 
-type BenchSearchProps = {
-  searchQuery: string;
-  setSearchQuery: (value: string) => void;
-  searchLoading: boolean;
-  searchError: string | null;
-  searchPerformed: boolean;
-  searchCooldown: boolean;
-  searchResults: SpotifyAlbumSearchResult[];
-  onSearch: (query: string) => void;
-  onAddAlbum: (album: SpotifyAlbumSearchResult, targetTier?: TierId, overId?: string) => void;
-};
-
-function SearchResultDraggable({
-  album,
-  onAdd,
-}: {
-  album: SpotifyAlbumSearchResult;
-  onAdd: (album: SpotifyAlbumSearchResult, targetTier?: TierId, overId?: string) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({
-    id: `search-${album.id}`,
-    data: { fromSearch: true, album },
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    cursor: 'grab',
-    opacity: isDragging ? 0.85 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      style={style}
-      className="flex gap-3 rounded-lg border border-gray-800 bg-gray-900/60 p-2 text-sm shadow-sm transition hover:border-emerald-400/60"
-      onDoubleClick={() => onAdd(album)}
-    >
-      <div className="relative h-12 w-12 overflow-hidden rounded-md border border-gray-800 bg-gray-950">
-        {album.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={album.image} alt={album.name} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-wide text-gray-500">
-            No art
-          </div>
-        )}
-      </div>
-      <div className="flex-1 space-y-0.5">
-        <p className="text-sm font-semibold text-white line-clamp-1">{album.name}</p>
-        <p className="text-xs text-gray-400 line-clamp-1">
-          {album.artists.length ? album.artists.join(', ') : 'Unknown artist'}
-        </p>
-        <div className="flex items-center gap-2 text-[11px] text-gray-500">
-          <span>{album.releaseDate ? new Date(album.releaseDate).getFullYear() : 'Year unknown'}</span>
-          {album.totalTracks ? <span>• {album.totalTracks} tracks</span> : null}
-        </div>
-      </div>
-      <div className="self-center text-[10px] uppercase tracking-wide text-emerald-200">Drag</div>
-    </div>
-  );
-}
-
-function UnrankedGrid({ albums, search }: { albums: TierListAlbum[]; search?: BenchSearchProps }) {
+function UnrankedGrid({ albums }: { albums: TierListAlbum[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unranked' });
 
   return (
@@ -354,8 +278,8 @@ function UnrankedGrid({ albums, search }: { albums: TierListAlbum[]; search?: Be
         isOver ? 'border-emerald-400' : 'border-gray-800'
       } bg-gray-950/60`}
     >
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 min-h-[58px]">
+        <div>
           <p className="text-lg font-semibold text-white">{unrankedDefinition.label}</p>
           <p className="text-sm text-gray-400">{unrankedDefinition.subheading}</p>
         </div>
@@ -363,61 +287,6 @@ function UnrankedGrid({ albums, search }: { albums: TierListAlbum[]; search?: Be
           {albums.length} album{albums.length === 1 ? '' : 's'}
         </span>
       </div>
-
-      {search && (
-        <div className="mb-4 rounded-xl border border-gray-800 bg-gray-900/70 p-3">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              search.onSearch(search.searchQuery);
-            }}
-            className="flex flex-col gap-2"
-          >
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
-              <input
-                type="text"
-                value={search.searchQuery}
-                onChange={(event) => search.setSearchQuery(event.target.value)}
-                placeholder="Search albums or artists to add to the bench"
-                className="w-full rounded-xl border border-gray-700/80 bg-gray-950/60 px-10 py-3 text-sm text-gray-100 placeholder-gray-500 transition focus:border-emerald-400 focus:outline-none"
-              />
-            </div>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-400 disabled:opacity-70"
-              disabled={search.searchLoading || search.searchCooldown}
-            >
-              {search.searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              <span>
-                {search.searchLoading
-                  ? 'Searching…'
-                  : search.searchCooldown
-                    ? 'Wait a sec…'
-                    : 'Search & add to bench'}
-              </span>
-            </button>
-          </form>
-          {search.searchError && (
-            <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-100">
-              {search.searchError}
-            </p>
-          )}
-          {!search.searchLoading && search.searchPerformed && search.searchResults.length === 0 && !search.searchError && (
-            <p className="mt-3 rounded-lg border border-dashed border-gray-700 px-3 py-2 text-xs text-gray-400">
-              No albums found. Try a different keyword.
-            </p>
-          )}
-          {search.searchResults.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {search.searchResults.map((album) => (
-                <SearchResultDraggable key={album.id} album={album} onAdd={search.onAddAlbum} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       <div
         ref={setNodeRef}
         className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2"
@@ -594,7 +463,7 @@ function TierAlbumTile({ album, variant }: { album: TierListAlbum; variant: 'ben
   );
 }
 
-export default function TierMakerBoard({ playlistId, manualMode = false }: TierMakerBoardProps) {
+export default function TierMakerBoard({ playlistId }: TierMakerBoardProps) {
   const [playlistName, setPlaylistName] = useState('');
   const [playlistOwner, setPlaylistOwner] = useState('');
   const [playlistImage, setPlaylistImage] = useState<string | null>(null);
@@ -607,12 +476,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SpotifyAlbumSearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchPerformed, setSearchPerformed] = useState(false);
-  const [searchCooldown, setSearchCooldown] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -625,29 +488,7 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
   useEffect(() => {
     let isCancelled = false;
 
-    if (manualMode) {
-      setPlaylistName((prev) => prev || 'Custom Tier Board');
-      setPlaylistOwner((prev) => prev || 'You');
-      setPlaylistImage(null);
-      setGeneratedImageUrl(null);
-      setSaveSuccess(false);
-      setSaveError(null);
-      setTiers(createEmptyTierState());
-      setTierMetadata(createDefaultTierMetadata());
-      setLoading(false);
-      setError(null);
-      return () => {
-        isCancelled = true;
-      };
-    }
-
     async function loadPlaylist() {
-      if (!playlistId) {
-        setLoading(false);
-        setError('Unable to fetch playlist data. Double-check the link and try again.');
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
@@ -745,7 +586,7 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
     return () => {
       isCancelled = true;
     };
-  }, [manualMode, playlistId]);
+  }, [playlistId]);
 
   const findContainerByItemId = (itemId: string | number | symbol): TierId | null => {
     const idString = String(itemId);
@@ -763,11 +604,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) {
-      return;
-    }
-    const activeData = active.data?.current as DragData | undefined;
-    if (activeData?.fromSearch) {
-      // Let the drop handler add search results; no reordering needed here.
       return;
     }
     const activeContainer = findContainerByItemId(active.id);
@@ -799,15 +635,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) {
-      return;
-    }
-    const activeData = active.data?.current as { fromSearch?: boolean; album?: SpotifyAlbumSearchResult } | undefined;
-    if (activeData?.fromSearch && activeData.album) {
-      const overContainer = findContainerByItemId(over.id);
-      if (!overContainer) {
-        return;
-      }
-      handleAddAlbumFromSearch(activeData.album, overContainer, String(over.id));
       return;
     }
     const activeContainer = findContainerByItemId(active.id);
@@ -891,12 +718,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
       return;
     }
 
-    const tierPlaylistId = manualMode ? 'spotify-search-tier' : playlistId;
-    if (!tierPlaylistId) {
-      setSaveError('Playlist is not available for saving.');
-      return;
-    }
-
     setIsSaving(true);
     setSaveError(null);
 
@@ -907,9 +728,9 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          playlistId: tierPlaylistId,
-          playlistName: playlistName || 'Custom Tier Board',
-          playlistOwner: playlistOwner || 'Unknown curator',
+          playlistId,
+          playlistName,
+          playlistOwner,
           playlistImage,
           imageDataUrl: imageUrl,
           tierMetadata,
@@ -939,63 +760,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const performAlbumSearch = async (query: string) => {
-    const term = query.trim();
-    if (!term) {
-      setSearchError('Type an artist, album, or keyword to search.');
-      return;
-    }
-    try {
-      setSearchLoading(true);
-      setSearchError(null);
-      setSearchPerformed(true);
-      setSearchCooldown(true);
-      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(term)}&limit=12`);
-      if (!response.ok) {
-        throw new Error('Spotify search failed. Check your API keys and try again.');
-      }
-      const data = await response.json();
-      setSearchResults(Array.isArray(data.albums) ? data.albums : []);
-    } catch (err) {
-      console.error(err);
-      setSearchError(err instanceof Error ? err.message : 'Unexpected error while searching Spotify.');
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-      setTimeout(() => setSearchCooldown(false), 600);
-    }
-  };
-
-  const handleAddAlbumFromSearch = (album: SpotifyAlbumSearchResult, targetTier: TierId = 'unranked', overId?: string) => {
-    setTiers((prev) => {
-      const existing = Object.values(prev).flat().some((entry) => entry.id === album.id);
-      if (existing) {
-        return prev;
-      }
-      const nextAlbum: TierListAlbum = {
-        id: album.id,
-        name: album.name,
-        artist: album.artists[0] ?? 'Unknown Artist',
-        image: album.image,
-        releaseDate: album.releaseDate ?? '',
-        label: null,
-        notes: '',
-        rating: null,
-        spotifyUrl: album.spotifyUrl,
-        tier: targetTier,
-      };
-      const targetList = [...prev[targetTier]];
-      const overIndex =
-        typeof overId === 'string' ? targetList.findIndex((entry) => entry.id === overId) : -1;
-      const insertIndex = overIndex >= 0 ? overIndex : 0;
-      targetList.splice(insertIndex, 0, nextAlbum);
-      return {
-        ...prev,
-        [targetTier]: targetList,
-      };
-    });
   };
 
   if (loading) {
@@ -1085,24 +849,7 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
             </div>
             {!isPreparingDownload && (
               <div className="lg:order-2 lg:sticky lg:top-6 self-start">
-                <UnrankedGrid
-                  albums={tiers.unranked}
-                  search={
-                    manualMode
-                      ? {
-                          searchQuery,
-                          setSearchQuery,
-                          searchLoading,
-                          searchError,
-                          searchPerformed,
-                          searchCooldown,
-                          searchResults,
-                          onSearch: performAlbumSearch,
-                          onAddAlbum: handleAddAlbumFromSearch,
-                        }
-                      : undefined
-                  }
-                />
+                <UnrankedGrid albums={tiers.unranked} />
               </div>
             )}
           </div>
