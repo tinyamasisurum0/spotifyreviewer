@@ -74,11 +74,14 @@ export default async function ReviewsPage() {
           Unable to reach the database right now. Showing an empty feed until the connection is restored.
         </div>
       )}
+<<<<<<< HEAD
       {!loadError && missingDb && reviews.length === 0 && tierLists.length === 0 && (
         <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
           Database credentials are not configured. Add <code>POSTGRES_URL</code> (or <code>POSTGRES_URL_NON_POOLING</code>) to show shared reviews and tiers.
         </div>
       )}
+=======
+>>>>>>> 86b8ab0 (Add Spotify search UI and topster board)
       <div className="mb-8 flex justify-center">
         <Link
           href="/review-builder"

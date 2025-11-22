@@ -158,46 +158,36 @@ function mapRowToAlbum(row: TierListRow): TierListAlbum | null {
 
 export async function readTierLists(): Promise<StoredTierList[]> {
   try {
-    if (!process.env.POSTGRES_URL && !process.env.POSTGRES_URL_NON_POOLING) {
-      console.warn('POSTGRES_URL is not set; returning empty tier lists.');
-      return [];
-    }
-
     await ensureSchema();
 
-    const rows = await Promise.race([
-      withClient(async (client) => {
-        const { rows } = await client.sql<TierListRow>`
-          SELECT
-            l.id           AS tier_list_id,
-            l.playlist_id,
-            l.playlist_name,
-            l.playlist_owner,
-            l.playlist_image,
-            l.image_data_url,
-            l.created_at,
-            a.id           AS entry_id,
-            a.album_id,
-            a.tier,
-            a.position,
-            a.name         AS album_name,
-            a.artist,
-            a.image        AS album_image,
-            a.release_date,
-            a.label,
-            a.notes,
-            a.rating,
-            a.spotify_url
-          FROM tier_lists l
-          LEFT JOIN tier_list_albums a ON a.tier_list_id = l.id
-          ORDER BY l.created_at DESC, a.tier ASC, a.position ASC;
-        `;
-        return rows;
-      }),
-      new Promise<TierListRow[]>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out reading tier lists')), 4000)
-      ),
-    ]);
+    const rows = await withClient(async (client) => {
+      const { rows } = await client.sql<TierListRow>`
+        SELECT
+          l.id           AS tier_list_id,
+          l.playlist_id,
+          l.playlist_name,
+          l.playlist_owner,
+          l.playlist_image,
+          l.image_data_url,
+          l.created_at,
+          a.id           AS entry_id,
+          a.album_id,
+          a.tier,
+          a.position,
+          a.name         AS album_name,
+          a.artist,
+          a.image        AS album_image,
+          a.release_date,
+          a.label,
+          a.notes,
+          a.rating,
+          a.spotify_url
+        FROM tier_lists l
+        LEFT JOIN tier_list_albums a ON a.tier_list_id = l.id
+        ORDER BY l.created_at DESC, a.tier ASC, a.position ASC;
+      `;
+      return rows;
+    });
 
     const grouped = new Map<string, StoredTierList>();
 

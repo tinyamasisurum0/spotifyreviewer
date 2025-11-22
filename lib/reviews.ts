@@ -124,45 +124,36 @@ function mapRowToReview(row: ReviewRow): StoredReview {
 
 export async function readReviews(): Promise<StoredReview[]> {
   try {
-    if (!process.env.POSTGRES_URL && !process.env.POSTGRES_URL_NON_POOLING) {
-      console.warn('POSTGRES_URL is not set; returning empty reviews.');
-      return [];
-    }
     await ensureSchema();
 
-    const rows = await Promise.race([
-      withClient(async (client) => {
-        const { rows } = await client.sql<ReviewRow>`
-          SELECT
-            r.id          AS review_id,
-            r.playlist_id,
-            r.playlist_name,
-            r.playlist_owner,
-            r.playlist_image,
-            r.image_data_url,
-            r.review_mode,
-            r.created_at,
-            a.id          AS album_row_id,
-            a.album_id,
-            a.position,
-            a.name        AS album_name,
-            a.artist,
-            a.image       AS album_image,
-            a.release_date,
-            a.label,
-            a.notes,
-            a.rating,
-            a.spotify_url
-          FROM reviews r
-          LEFT JOIN review_albums a ON a.review_id = r.id
-          ORDER BY r.created_at DESC, a.position ASC;
-        `;
-        return rows;
-      }),
-      new Promise<ReviewRow[]>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out reading reviews')), 4000)
-      ),
-    ]);
+    const rows = await withClient(async (client) => {
+      const { rows } = await client.sql<ReviewRow>`
+        SELECT
+          r.id          AS review_id,
+          r.playlist_id,
+          r.playlist_name,
+          r.playlist_owner,
+          r.playlist_image,
+          r.image_data_url,
+          r.review_mode,
+          r.created_at,
+          a.id          AS album_row_id,
+          a.album_id,
+          a.position,
+          a.name        AS album_name,
+          a.artist,
+          a.image       AS album_image,
+          a.release_date,
+          a.label,
+          a.notes,
+          a.rating,
+          a.spotify_url
+        FROM reviews r
+        LEFT JOIN review_albums a ON a.review_id = r.id
+        ORDER BY r.created_at DESC, a.position ASC;
+      `;
+      return rows;
+    });
 
     const grouped = new Map<string, StoredReview>();
 
