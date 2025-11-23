@@ -299,14 +299,13 @@ function SearchResultDraggable({
   album: SpotifyAlbumSearchResult;
   onAdd: (album: SpotifyAlbumSearchResult, targetTier?: TierId, overId?: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `search-${album.id}`,
     data: { fromSearch: true, album },
   });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
     cursor: 'grab',
     opacity: isDragging ? 0.85 : 1,
   };
