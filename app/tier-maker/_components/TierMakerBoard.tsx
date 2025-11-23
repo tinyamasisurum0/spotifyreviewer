@@ -423,13 +423,7 @@ function UnrankedGrid({ albums, search }: { albums: TierListAlbum[]; search?: Be
         className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2"
       >
         <SortableContext items={albums.map((album) => album.id)} strategy={rectSortingStrategy}>
-          {albums.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-700/80 px-4 py-6 text-center text-sm text-gray-400">
-              Drop any album here to keep it off the tier board for now.
-            </div>
-          ) : (
-            albums.map((album) => <TierAlbumTile key={album.id} album={album} variant="bench" />)
-          )}
+          {albums.map((album) => <TierAlbumTile key={album.id} album={album} variant="bench" />)}
         </SortableContext>
       </div>
     </section>
