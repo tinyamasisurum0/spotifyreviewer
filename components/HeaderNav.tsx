@@ -9,7 +9,6 @@ const navLinks = [
   { href: '/blog', label: 'Blog' },
   { href: '/', label: 'Reviews' },
   { href: '/tier-maker', label: 'Tier Maker' },
-  { href: '/topster', label: 'Topster' },
   { href: '/review-builder', label: 'Review Builder' },
 ];
 
