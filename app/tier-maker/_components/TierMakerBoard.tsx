@@ -26,6 +26,7 @@ import {
   getAlbumsDetails,
   getPlaylistDetails,
   getPlaylistTracks,
+  extractPlaylistIdFromUrl,
   type SpotifyAlbumSearchResult,
 } from '@/utils/spotifyApi';
 import {
@@ -51,11 +52,6 @@ type SpotifyTrack = {
   track: {
     album: SpotifyAlbum;
   };
-};
-
-type TierMakerBoardProps = {
-  playlistId?: string;
-  manualMode?: boolean;
 };
 
 const sanitizeLabel = (value?: string | null) =>
@@ -281,6 +277,11 @@ type BenchSearchProps = {
   searchError: string | null;
   searchCooldown: boolean;
   onSearch: (query: string) => void;
+  playlistUrl: string;
+  setPlaylistUrl: (value: string) => void;
+  playlistLoading: boolean;
+  playlistError: string | null;
+  onLoadPlaylist: (url: string) => void;
 };
 
 function AlbumTilePreview({ album }: { album: TierListAlbum }) {
@@ -319,44 +320,79 @@ function AlbumTilePreview({ album }: { album: TierListAlbum }) {
 
 function SearchPanel({ search }: { search: BenchSearchProps }) {
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 shadow-inner shadow-black/40">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          search.onSearch(search.searchQuery);
-        }}
-        className="flex flex-col gap-2"
-      >
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 shadow-inner shadow-black/40">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Load Playlist</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            search.onLoadPlaylist(search.playlistUrl);
+          }}
+          className="flex flex-col gap-2"
+        >
           <input
             type="text"
-            value={search.searchQuery}
-            onChange={(event) => search.setSearchQuery(event.target.value)}
-            placeholder="Search albums or artists to add to bench"
-            className="w-full rounded-xl border border-gray-700/80 bg-gray-950/60 px-10 py-3 text-sm text-gray-100 placeholder-gray-500 focus:border-emerald-400 focus:outline-none"
+            value={search.playlistUrl}
+            onChange={(event) => search.setPlaylistUrl(event.target.value)}
+            placeholder="Paste Spotify playlist URL"
+            className="w-full rounded-xl border border-gray-700/80 bg-gray-950/60 px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:border-emerald-400 focus:outline-none"
           />
-        </div>
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 disabled:opacity-70"
-          disabled={search.searchLoading || search.searchCooldown}
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 disabled:opacity-70"
+            disabled={search.playlistLoading}
+          >
+            {search.playlistLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <span>{search.playlistLoading ? 'Loading…' : 'Load Albums'}</span>
+          </button>
+        </form>
+        {search.playlistError && (
+          <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-100">
+            {search.playlistError}
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 shadow-inner shadow-black/40">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Search Albums</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            search.onSearch(search.searchQuery);
+          }}
+          className="flex flex-col gap-2"
         >
-          {search.searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          <span>
-            {search.searchLoading
-              ? 'Searching…'
-              : search.searchCooldown
-                ? 'Wait a sec…'
-                : 'Search & add to bench'}
-          </span>
-        </button>
-      </form>
-      {search.searchError && (
-        <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-100">
-          {search.searchError}
-        </p>
-      )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              value={search.searchQuery}
+              onChange={(event) => search.setSearchQuery(event.target.value)}
+              placeholder="Search albums or artists to add to bench"
+              className="w-full rounded-xl border border-gray-700/80 bg-gray-950/60 px-10 py-3 text-sm text-gray-100 placeholder-gray-500 focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 disabled:opacity-70"
+            disabled={search.searchLoading || search.searchCooldown}
+          >
+            {search.searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            <span>
+              {search.searchLoading
+                ? 'Searching…'
+                : search.searchCooldown
+                  ? 'Wait a sec…'
+                  : 'Search & add to bench'}
+            </span>
+          </button>
+        </form>
+        {search.searchError && (
+          <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-100">
+            {search.searchError}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -552,14 +588,12 @@ function TierAlbumTile({ album, variant }: { album: TierListAlbum; variant: 'ben
   );
 }
 
-export default function TierMakerBoard({ playlistId, manualMode = false }: TierMakerBoardProps) {
-  const [playlistName, setPlaylistName] = useState('');
-  const [playlistOwner, setPlaylistOwner] = useState('');
+export default function TierMakerBoard() {
+  const [playlistName, setPlaylistName] = useState('Custom Tier Board');
+  const [playlistOwner, setPlaylistOwner] = useState('You');
   const [playlistImage, setPlaylistImage] = useState<string | null>(null);
   const [tiers, setTiers] = useState<TierState>(() => createEmptyTierState());
   const [tierMetadata, setTierMetadata] = useState<TierMetadataMap>(() => createDefaultTierMetadata());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -569,6 +603,9 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchCooldown, setSearchCooldown] = useState(false);
+  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [activeDragItem, setActiveDragItem] = useState<{ type: 'album'; data: TierListAlbum } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
@@ -579,114 +616,96 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
     })
   );
 
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadPlaylist() {
-      if (!playlistId) {
-        setLoading(false);
-        setError('Unable to fetch playlist data. Double-check the link and try again.');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-        setGeneratedImageUrl(null);
-        setSaveSuccess(false);
-        setSaveError(null);
-        setTiers(createEmptyTierState());
-
-        const tracks = await getPlaylistTracks(playlistId);
-        const { name, owner, image } = await getPlaylistDetails(playlistId);
-
-        if (isCancelled) {
-          return;
-        }
-
-        setPlaylistName(name);
-        setPlaylistOwner(owner);
-        setPlaylistImage(image ?? null);
-
-        let uniqueAlbums = tracks.reduce((acc: SpotifyAlbum[], item: SpotifyTrack) => {
-          const spotifyAlbum = item.track.album;
-          const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
-          if (!acc.some((existing) => existing.id === albumId)) {
-            acc.push({
-              ...spotifyAlbum,
-              id: albumId,
-            });
-          }
-          return acc;
-        }, []);
-
-        const albumIds = uniqueAlbums
-          .map((album: SpotifyAlbum) => album.id ?? '')
-          .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
-        if (albumIds.length > 0) {
-          try {
-            const extraDetails = await getAlbumsDetails(albumIds);
-            uniqueAlbums = uniqueAlbums.map((album: SpotifyAlbum) => {
-              const details = extraDetails[album.id];
-              if (!details) {
-                return album;
-              }
-              return {
-                ...album,
-                label: sanitizeLabel(album.label) ?? sanitizeLabel(details.label),
-                images:
-                  album.images && album.images.length > 0
-                    ? album.images
-                    : Array.isArray(details.images)
-                      ? details.images
-                      : [],
-                release_date: album.release_date ?? details.release_date ?? album.release_date,
-                external_urls: album.external_urls ?? details.external_urls,
-              };
-            });
-          } catch (detailError) {
-            console.error('Failed to enrich albums for tier maker', detailError);
-          }
-        }
-
-        const mappedAlbums: TierListAlbum[] = uniqueAlbums.map((album: SpotifyAlbum) => ({
-          id: album.id,
-          name: album.name,
-          artist: album.artists?.[0]?.name ?? 'Unknown Artist',
-          image: album.images?.[0]?.url ?? null,
-          releaseDate: album.release_date ?? '',
-          label: sanitizeLabel(album.label),
-          notes: '',
-          rating: null,
-          spotifyUrl: album.external_urls?.spotify ?? null,
-          tier: 'unranked',
-        }));
-
-        setTiers({
-          unranked: mappedAlbums,
-          s: [],
-          a: [],
-          b: [],
-          c: [],
-        });
-        setTierMetadata(createDefaultTierMetadata());
-      } catch {
-        if (!isCancelled) {
-          setError('Unable to fetch playlist data. Double-check the link and try again.');
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
+  const loadPlaylistAlbums = async (url: string) => {
+    const playlistId = extractPlaylistIdFromUrl(url);
+    if (!playlistId) {
+      setPlaylistError('Invalid Spotify playlist URL. Make sure you\'re pasting a playlist link.');
+      return;
     }
 
-    loadPlaylist();
+    try {
+      setPlaylistLoading(true);
+      setPlaylistError(null);
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [playlistId]);
+      const tracks = await getPlaylistTracks(playlistId);
+      const { name, owner, image } = await getPlaylistDetails(playlistId);
+
+      setPlaylistName(name);
+      setPlaylistOwner(owner);
+      setPlaylistImage(image ?? null);
+
+      let uniqueAlbums = tracks.reduce((acc: SpotifyAlbum[], item: SpotifyTrack) => {
+        const spotifyAlbum = item.track.album;
+        const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
+        if (!acc.some((existing) => existing.id === albumId)) {
+          acc.push({
+            ...spotifyAlbum,
+            id: albumId,
+          });
+        }
+        return acc;
+      }, []);
+
+      const albumIds = uniqueAlbums
+        .map((album: SpotifyAlbum) => album.id ?? '')
+        .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
+      if (albumIds.length > 0) {
+        try {
+          const extraDetails = await getAlbumsDetails(albumIds);
+          uniqueAlbums = uniqueAlbums.map((album: SpotifyAlbum) => {
+            const details = extraDetails[album.id];
+            if (!details) {
+              return album;
+            }
+            return {
+              ...album,
+              label: sanitizeLabel(album.label) ?? sanitizeLabel(details.label),
+              images:
+                album.images && album.images.length > 0
+                  ? album.images
+                  : Array.isArray(details.images)
+                    ? details.images
+                    : [],
+              release_date: album.release_date ?? details.release_date ?? album.release_date,
+              external_urls: album.external_urls ?? details.external_urls,
+            };
+          });
+        } catch (detailError) {
+          console.error('Failed to enrich albums for tier maker', detailError);
+        }
+      }
+
+      const mappedAlbums: TierListAlbum[] = uniqueAlbums.map((album: SpotifyAlbum) => ({
+        id: album.id,
+        name: album.name,
+        artist: album.artists?.[0]?.name ?? 'Unknown Artist',
+        image: album.images?.[0]?.url ?? null,
+        releaseDate: album.release_date ?? '',
+        label: sanitizeLabel(album.label),
+        notes: '',
+        rating: null,
+        spotifyUrl: album.external_urls?.spotify ?? null,
+        tier: 'unranked',
+      }));
+
+      // Append to existing albums, removing duplicates
+      setTiers((prev) => {
+        const existingIds = new Set(Object.values(prev).flat().map((album) => album.id));
+        const uniqueNewAlbums = mappedAlbums.filter((album) => !existingIds.has(album.id));
+        return {
+          ...prev,
+          unranked: [...prev.unranked, ...uniqueNewAlbums],
+        };
+      });
+
+      setPlaylistUrl(''); // Clear the input after loading
+    } catch (err) {
+      console.error(err);
+      setPlaylistError('Unable to fetch playlist data. Double-check the link and try again.');
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
 
   const findContainerByItemId = (itemId: string | number | symbol): TierId | null => {
     const idString = String(itemId);
@@ -840,11 +859,7 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
       return;
     }
 
-    const tierPlaylistId = manualMode ? 'spotify-search-tier' : playlistId;
-    if (!tierPlaylistId) {
-      setSaveError('Playlist is not available for saving.');
-      return;
-    }
+    const tierPlaylistId = 'custom-tier-board';
 
     setIsSaving(true);
     setSaveError(null);
@@ -941,22 +956,6 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-emerald-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-100">
-        {error}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div
@@ -1036,6 +1035,11 @@ export default function TierMakerBoard({ playlistId, manualMode = false }: TierM
                       searchError,
                       searchCooldown,
                       onSearch: performAlbumSearch,
+                      playlistUrl,
+                      setPlaylistUrl,
+                      playlistLoading,
+                      playlistError,
+                      onLoadPlaylist: loadPlaylistAlbums,
                     }}
                   />
                 </div>
