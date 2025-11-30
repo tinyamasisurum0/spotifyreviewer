@@ -920,14 +920,15 @@ export default function TierMakerBoard() {
         throw new Error('Spotify search failed. Check your API keys and try again.');
       }
       const data = await response.json();
-      let newAlbums: SpotifyAlbumSearchResult[] = Array.isArray(data.albums) ? data.albums : [];
+      const newAlbums: SpotifyAlbumSearchResult[] = Array.isArray(data.albums) ? data.albums : [];
 
       // Enrich with album details (including label) like we do for playlists
       const albumIds = newAlbums.map((album) => album.id).filter((id) => id && id.length > 0);
       let albumDetailsMap: Record<string, { label?: string | null }> = {};
       if (albumIds.length > 0) {
         try {
-          albumDetailsMap = await getAlbumsDetails(albumIds);
+          const details = await getAlbumsDetails(albumIds);
+          albumDetailsMap = details;
         } catch (detailError) {
           console.error('Failed to enrich search results with album details', detailError);
         }
