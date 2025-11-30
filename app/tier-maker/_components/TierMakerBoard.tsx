@@ -920,25 +920,39 @@ export default function TierMakerBoard() {
         throw new Error('Spotify search failed. Check your API keys and try again.');
       }
       const data = await response.json();
-      const newAlbums: SpotifyAlbumSearchResult[] = Array.isArray(data.albums) ? data.albums : [];
+      let newAlbums: SpotifyAlbumSearchResult[] = Array.isArray(data.albums) ? data.albums : [];
+
+      // Enrich with album details (including label) like we do for playlists
+      const albumIds = newAlbums.map((album) => album.id).filter((id) => id && id.length > 0);
+      let albumDetailsMap: Record<string, { label?: string | null }> = {};
+      if (albumIds.length > 0) {
+        try {
+          albumDetailsMap = await getAlbumsDetails(albumIds);
+        } catch (detailError) {
+          console.error('Failed to enrich search results with album details', detailError);
+        }
+      }
 
       // Add search results directly to unranked tier
       setTiers((prev) => {
         const existingIds = new Set(Object.values(prev).flat().map((album) => album.id));
         const uniqueNewAlbums: TierListAlbum[] = newAlbums
           .filter((album) => !existingIds.has(album.id))
-          .map((album) => ({
-            id: album.id,
-            name: album.name,
-            artist: album.artists[0] ?? 'Unknown Artist',
-            image: album.image,
-            releaseDate: album.releaseDate ?? '',
-            label: null,
-            notes: '',
-            rating: null,
-            spotifyUrl: album.spotifyUrl,
-            tier: 'unranked',
-          }));
+          .map((album) => {
+            const details = albumDetailsMap[album.id];
+            return {
+              id: album.id,
+              name: album.name,
+              artist: album.artists[0] ?? 'Unknown Artist',
+              image: album.image,
+              releaseDate: album.releaseDate ?? '',
+              label: sanitizeLabel(details?.label),
+              notes: '',
+              rating: null,
+              spotifyUrl: album.spotifyUrl,
+              tier: 'unranked',
+            };
+          });
 
         return {
           ...prev,
