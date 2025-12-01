@@ -346,3 +346,22 @@ export async function getTierListById(id: string): Promise<StoredTierList | null
 
   return tierList;
 }
+
+export async function deleteTierListById(id: string): Promise<boolean> {
+  await ensureSchema();
+
+  try {
+    const result = await withClient(async (client) => {
+      const { rowCount } = await client.sql`
+        DELETE FROM tier_lists
+        WHERE id = ${id}::uuid;
+      `;
+      return rowCount;
+    });
+
+    return result !== null && result > 0;
+  } catch (error) {
+    console.error('Failed to delete tier list', error);
+    throw error;
+  }
+}

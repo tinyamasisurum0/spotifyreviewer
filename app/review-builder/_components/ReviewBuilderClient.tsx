@@ -2,11 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Copy } from 'lucide-react';
+import { Copy, Link as LinkIcon, FileImage } from 'lucide-react';
 import { extractPlaylistIdFromUrl } from '@/utils/spotifyApi';
 import PlaylistAnalyzer, { InputMode } from '@/components/PlaylistAnalyzer';
 import { DragDropContext } from 'react-beautiful-dnd';
 import type { StoredReview } from '@/types/review';
+import ImageListImporter from './ImageListImporter';
+
+type ImportSource = 'playlist' | 'image';
 
 function InnerReviewBuilder() {
   const searchParams = useSearchParams();
@@ -21,6 +24,8 @@ function InnerReviewBuilder() {
   const [preloadedReview, setPreloadedReview] = useState<StoredReview | null>(null);
   const [loadingReview, setLoadingReview] = useState(false);
   const [preloadError, setPreloadError] = useState<string | null>(null);
+  const [importSource, setImportSource] = useState<ImportSource>('playlist');
+  const [importedAlbums, setImportedAlbums] = useState<any[]>([]);
   const samplePlaylistUrl = 'https://open.spotify.com/playlist/0xy8aNki7WxsM42dkTOmER';
 
   const preloadedInitialData = useMemo(
@@ -110,9 +115,18 @@ function InnerReviewBuilder() {
       setPreloadedReview(null);
       setPreloadError(null);
       setPlaylistId(id);
+      setImportedAlbums([]);
     } else {
       alert("Geçersiz Spotify playlist URL'si. Lütfen kontrol edip tekrar deneyin.");
     }
+  };
+
+  const handleImageImport = (albums: any[]) => {
+    setImportedAlbums(albums);
+    setPlaylistId(null);
+    setPreloadedReview(null);
+    setPreloadError(null);
+    setInputMode('plain');
   };
 
   return (
@@ -121,7 +135,7 @@ function InnerReviewBuilder() {
         <div className="mb-5 grid gap-3 rounded-2xl border border-gray-800/70 bg-gray-950/70 p-4 text-sm text-gray-200 sm:grid-cols-3">
           <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
             <p className="text-xs font-semibold uppercase text-gray-400">Step 1</p>
-            <p className="mt-1 text-base font-medium">Paste your Playlist link to pull every album instantly.</p>
+            <p className="mt-1 text-base font-medium">{importSource === 'playlist' ? 'Paste your Playlist link to pull every album instantly.' : 'Upload an image with album list to extract albums.'}</p>
           </div>
           <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
             <p className="text-xs font-semibold uppercase text-gray-400">Step 2</p>
@@ -129,43 +143,77 @@ function InnerReviewBuilder() {
           </div>
           <div className="rounded-xl border border-gray-800/60 bg-gray-900/60 p-3">
             <p className="text-xs font-semibold uppercase text-gray-400">Step 3</p>
-            <p className="mt-1 text-base font-medium">Export or share once your Playlist link looks perfect.</p>
+            <p className="mt-1 text-base font-medium">Export or share once your list looks perfect.</p>
           </div>
         </div>
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-800 bg-gray-900/50 px-4 py-3 text-xs shadow-inner shadow-black/40">
-          <span className="uppercase tracking-wide text-gray-400">Sample playlist</span>
-          <a
-            href={samplePlaylistUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-gray-200 transition-colors hover:text-emerald-300 truncate max-w-[240px] sm:max-w-[320px]"
-          >
-            {samplePlaylistUrl}
-          </a>
+
+        <div className="mb-6 flex gap-3">
           <button
-            type="button"
-            onClick={handleCopySampleLink}
-            className="inline-flex items-center gap-1 rounded-full border border-gray-700 px-3 py-1 text-gray-200 transition-colors hover:border-emerald-400 hover:text-emerald-300"
+            onClick={() => setImportSource('playlist')}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
+              importSource === 'playlist'
+                ? 'border-emerald-400 bg-emerald-500/10 text-emerald-300'
+                : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:border-gray-600'
+            }`}
           >
-            <Copy className="h-3.5 w-3.5" />
-            <span>{copiedSampleLink ? 'Copied!' : 'Copy link'}</span>
+            <LinkIcon className="h-4 w-4" />
+            Import from Playlist
+          </button>
+          <button
+            onClick={() => setImportSource('image')}
+            className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
+              importSource === 'image'
+                ? 'border-emerald-400 bg-emerald-500/10 text-emerald-300'
+                : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:border-gray-600'
+            }`}
+          >
+            <FileImage className="h-4 w-4" />
+            Import from Image
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="mb-8">
-          <input
-            type="text"
-            value={playlistUrl}
-            onChange={(e) => setPlaylistUrl(e.target.value)}
-            placeholder="Drop your playlist link to get started"
-            className="mb-3 w-full rounded-2xl border border-gray-700/80 bg-gray-900/70 px-4 py-3 text-base text-gray-100 placeholder-gray-500 transition focus:border-emerald-400 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-semibold text-gray-900 transition hover:bg-emerald-400 sm:w-auto sm:px-6"
-          >
-            Load Albums
-          </button>
-        </form>
+        {importSource === 'playlist' && (
+          <>
+            <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-800 bg-gray-900/50 px-4 py-3 text-xs shadow-inner shadow-black/40">
+              <span className="uppercase tracking-wide text-gray-400">Sample playlist</span>
+              <a
+                href={samplePlaylistUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-gray-200 transition-colors hover:text-emerald-300 truncate max-w-[240px] sm:max-w-[320px]"
+              >
+                {samplePlaylistUrl}
+              </a>
+              <button
+                type="button"
+                onClick={handleCopySampleLink}
+                className="inline-flex items-center gap-1 rounded-full border border-gray-700 px-3 py-1 text-gray-200 transition-colors hover:border-emerald-400 hover:text-emerald-300"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>{copiedSampleLink ? 'Copied!' : 'Copy link'}</span>
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="mb-8">
+              <input
+                type="text"
+                value={playlistUrl}
+                onChange={(e) => setPlaylistUrl(e.target.value)}
+                placeholder="Drop your playlist link to get started"
+                className="mb-3 w-full rounded-2xl border border-gray-700/80 bg-gray-900/70 px-4 py-3 text-base text-gray-100 placeholder-gray-500 transition focus:border-emerald-400 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-semibold text-gray-900 transition hover:bg-emerald-400 sm:w-auto sm:px-6"
+              >
+                Load Albums
+              </button>
+            </form>
+          </>
+        )}
+        {importSource === 'image' && (
+          <div className="mb-8">
+            <ImageListImporter onImportComplete={handleImageImport} />
+          </div>
+        )}
         {loadingReview && !preloadError && (
           <div className="mb-6 rounded border border-gray-700 bg-gray-900/70 px-4 py-3 text-sm text-gray-300">
             Loading saved review…
@@ -184,15 +232,14 @@ function InnerReviewBuilder() {
             initialData={preloadedInitialData}
           />
         )}
-      </div>
-      <div>
-        <p className="text-center m-6">
-          Made by{' '}
-          <a className="font-extrabold underline" target="_blank" href="https://x.com/tinyamasisurum0">
-            tinyamasisurum0
-          </a>{' '}
-          - Messages on X for feature requests are appreciated.
-        </p>
+        {importedAlbums.length > 0 && !playlistId && (
+          <PlaylistAnalyzer
+            playlistId="imported-from-image"
+            inputMode={inputMode}
+            onInputModeChange={setInputMode}
+            importedAlbums={importedAlbums}
+          />
+        )}
       </div>
     </DragDropContext>
   );

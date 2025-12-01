@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toJpeg } from 'html-to-image';
-import { Star, StarHalf, Trash2, ExternalLink } from 'lucide-react';
+import { Star, StarHalf, Trash2, ExternalLink, Sparkles } from 'lucide-react';
 import type { StoredAlbum, ReviewMode } from '@/types/review';
 import { getRankDecoration } from '@/components/rankDecorations';
 
@@ -351,7 +351,7 @@ function SortablePlainAlbumItem({
         }`}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-md border border-gray-800 bg-gray-950/80">
-          {album.images[0]?.url ? (
+          {album.images && album.images.length > 0 && album.images[0]?.url ? (
             <Image src={album.images[0].url} alt={album.name} fill className="object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-xs uppercase tracking-wide text-gray-500">
@@ -511,6 +511,7 @@ interface PlaylistAnalyzerProps {
   inputMode: InputMode;
   onInputModeChange: (mode: InputMode) => void;
   initialData?: InitialReviewData;
+  importedAlbums?: SpotifyAlbum[];
 }
 
 export default function PlaylistAnalyzer({
@@ -518,16 +519,35 @@ export default function PlaylistAnalyzer({
   inputMode,
   onInputModeChange,
   initialData,
+  importedAlbums,
 }: PlaylistAnalyzerProps) {
   const isRatingLocked = Boolean(initialData);
-  const [albums, setAlbums] = useState<Album[]>(() =>
-    initialData ? initialData.albums.map(mapStoredAlbumToAlbum) : []
-  );
-  const [loading, setLoading] = useState(() => !initialData);
+  const [albums, setAlbums] = useState<Album[]>(() => {
+    if (initialData) {
+      return initialData.albums.map(mapStoredAlbumToAlbum);
+    }
+    if (importedAlbums) {
+      return importedAlbums.map((album) => ({
+        ...album,
+        images: album.images || [],
+        artists: album.artists || [{ name: 'Unknown Artist' }],
+        notes: '',
+        rating: null,
+        spotifyUrl: album.external_urls?.spotify ?? null,
+        label: album.label && album.label.trim().length > 0 ? album.label.trim() : null,
+      }));
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => !initialData && !importedAlbums);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [playlistName, setPlaylistName] = useState<string>(initialData?.playlistName ?? '');
-  const [playlistOwner, setPlaylistOwner] = useState<string>(initialData?.playlistOwner ?? '');
+  const [playlistName, setPlaylistName] = useState<string>(
+    initialData?.playlistName ?? (importedAlbums ? 'Imported Album List' : '')
+  );
+  const [playlistOwner, setPlaylistOwner] = useState<string>(
+    initialData?.playlistOwner ?? (importedAlbums ? 'You' : '')
+  );
   const [playlistImage, setPlaylistImage] = useState<string | null>(initialData?.playlistImage ?? null);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
@@ -535,7 +555,7 @@ export default function PlaylistAnalyzer({
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [hideRankDecorations, setHideRankDecorations] = useState(false);
+  const [hideRankDecorations, setHideRankDecorations] = useState(importedAlbums ? true : false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -571,6 +591,9 @@ export default function PlaylistAnalyzer({
       return;
     }
     if (initialData && initialData.playlistId === playlistId) {
+      return;
+    }
+    if (importedAlbums) {
       return;
     }
 
@@ -671,7 +694,7 @@ export default function PlaylistAnalyzer({
     return () => {
       isCancelled = true;
     };
-  }, [playlistId, initialData]);
+  }, [playlistId, initialData, importedAlbums]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -939,15 +962,17 @@ export default function PlaylistAnalyzer({
           </SortableContext>
         </DndContext>
       </div>
-      <div className="mt-6 flex w-full justify-center">
+      <div className="mt-12 mb-8 flex w-full justify-center">
         <button
           onClick={handleGenerateClick}
           disabled={isPreparingDownload}
-          className="w-full px-6 py-3 text-lg font-semibold text-center rounded-lg bg-blue-500 text-white shadow-lg transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-400 disabled:opacity-80 sm:w-auto sm:px-8"
+          className="group relative inline-flex items-center gap-3 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 px-8 py-4 text-lg font-bold text-white shadow-lg shadow-emerald-500/50 transition-all hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-75 disabled:hover:scale-100"
         >
-          Generate Image
+          <Sparkles className="h-6 w-6" />
+          <span>{isPreparingDownload ? 'Preparing…' : 'Generate Review'}</span>
         </button>
       </div>
+      <div className="h-6"></div>
       {showDownloadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-md space-y-6 rounded-lg border border-gray-700 bg-gray-900 p-6 shadow-xl">

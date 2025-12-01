@@ -20,7 +20,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, Loader2, Search } from 'lucide-react';
+import { ExternalLink, Loader2, Search, Sparkles } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import {
   getAlbumsDetails,
@@ -607,6 +607,7 @@ export default function TierMakerBoard() {
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
   const [activeDragItem, setActiveDragItem] = useState<{ type: 'album'; data: TierListAlbum } | null>(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -823,6 +824,7 @@ export default function TierMakerBoard() {
       setGeneratedImageUrl(dataUrl);
       setSaveError(null);
       setSaveSuccess(false);
+      setShowDownloadModal(true);
       return dataUrl;
     } catch (err) {
       console.error('Failed to generate tier maker JPEG', err);
@@ -832,6 +834,14 @@ export default function TierMakerBoard() {
       setIsPreparingDownload(false);
     }
   }, []);
+
+  const handleGenerateClick = async () => {
+    await generateImage();
+  };
+
+  const handleCloseModal = () => {
+    setShowDownloadModal(false);
+  };
 
   const handleDownload = async () => {
     const imageUrl = generatedImageUrl ?? (await generateImage());
@@ -1072,66 +1082,71 @@ export default function TierMakerBoard() {
         </DndContext>
       </div>
 
-      <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Export or Share</h2>
-            <p className="text-sm text-gray-400">
-              Generate the JPEG first, then download or send it to the shared tier wall.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={generateImage}
-            disabled={isPreparingDownload}
-            className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-gray-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-75"
-          >
-            {isPreparingDownload ? 'Preparing…' : 'Generate Tier Graphic'}
-          </button>
-        </div>
-        {generatedImageUrl && (
-          <div className="mt-4 rounded-xl border border-gray-800 bg-black/40 p-4 text-center">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Preview</p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={generatedImageUrl}
-              alt="Tier maker preview"
-              className="mx-auto mt-3 max-h-96 rounded-lg border border-gray-800 object-contain"
-            />
-          </div>
-        )}
-        {saveError && (
-          <p className="mt-4 rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-            {saveError}
-          </p>
-        )}
-        {saveSuccess && (
-          <p className="mt-4 rounded border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
-            Tier list saved. Visit the{' '}
-            <a href="/reviews#tier-lists" className="font-semibold underline">
-              shared wall
-            </a>{' '}
-            to grab the link.
-          </p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="rounded-md border border-gray-700 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:border-gray-500"
-          >
-            Download JPEG
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="rounded-md border border-transparent bg-emerald-500 px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSaving ? 'Saving…' : 'Save & Share'}
-          </button>
-        </div>
+      <div className="mt-12 mb-8 flex w-full justify-center">
+        <button
+          onClick={handleGenerateClick}
+          disabled={isPreparingDownload}
+          className="group relative inline-flex items-center gap-3 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 px-8 py-4 text-lg font-bold text-white shadow-lg shadow-emerald-500/50 transition-all hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-75 disabled:hover:scale-100"
+        >
+          <Sparkles className="h-6 w-6" />
+          <span>{isPreparingDownload ? 'Preparing…' : 'Generate Tier'}</span>
+        </button>
       </div>
+      <div className="h-6"></div>
+
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md space-y-6 rounded-lg border border-gray-700 bg-gray-900 p-6 shadow-xl">
+            <div className="space-y-1">
+              <h3 className="text-xl font-semibold text-white">Your image is ready</h3>
+              <p className="text-sm text-gray-400">
+                Download the generated JPEG whenever you&apos;re ready.
+              </p>
+            </div>
+            <div className="flex h-32 w-full items-center justify-center rounded-lg border border-dashed border-gray-600 bg-gray-800 text-sm uppercase tracking-wide text-gray-500">
+              Advertisement Placeholder
+            </div>
+            {saveSuccess && (
+              <div className="rounded border border-green-500 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+                Tier list saved. Visit the{' '}
+                <a href="/reviews#tier-lists" className="font-semibold text-green-300 underline underline-offset-2">
+                  Review Listing
+                </a>{' '}
+                to share it.
+              </div>
+            )}
+            {saveError && (
+              <div className="rounded border border-red-500 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                {saveError}
+              </div>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="rounded border border-gray-600 px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-400 hover:text-white"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving || saveSuccess}
+                className="rounded bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-80"
+              >
+                {saveSuccess ? 'Saved' : isSaving ? 'Saving…' : 'Save & Share'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="rounded bg-green-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+              >
+                Download JPEG
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
