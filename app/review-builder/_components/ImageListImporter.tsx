@@ -104,7 +104,7 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
     }
   };
 
-  const searchSpotifyAlbum = async (album: MatchedAlbum, index: number): Promise<SpotifyAlbum | null> => {
+  const searchSpotifyAlbum = async (album: MatchedAlbum): Promise<SpotifyAlbum | null> => {
     try {
       // Try advanced search first
       let query = `artist:${album.artist} album:${album.album}`;
@@ -162,7 +162,7 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
       updatedAlbums[i].searching = true;
       setParsedAlbums([...updatedAlbums]);
 
-      const spotifyData = await searchSpotifyAlbum(updatedAlbums[i], i);
+      const spotifyData = await searchSpotifyAlbum(updatedAlbums[i]);
 
       updatedAlbums[i].searching = false;
       updatedAlbums[i].matched = spotifyData !== null;
@@ -181,7 +181,7 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
     updatedAlbums[index].searching = true;
     setParsedAlbums(updatedAlbums);
 
-    const spotifyData = await searchSpotifyAlbum(updatedAlbums[index], index);
+    const spotifyData = await searchSpotifyAlbum(updatedAlbums[index]);
 
     updatedAlbums[index].searching = false;
     updatedAlbums[index].matched = spotifyData !== null;

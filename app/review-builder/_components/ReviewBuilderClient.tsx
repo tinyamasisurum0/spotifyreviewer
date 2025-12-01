@@ -9,6 +9,16 @@ import { DragDropContext } from 'react-beautiful-dnd';
 import type { StoredReview } from '@/types/review';
 import ImageListImporter from './ImageListImporter';
 
+interface SpotifyAlbum {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  images: { url: string }[];
+  release_date: string;
+  label?: string | null;
+  external_urls?: { spotify?: string };
+}
+
 type ImportSource = 'playlist' | 'image';
 
 function InnerReviewBuilder() {
@@ -25,7 +35,7 @@ function InnerReviewBuilder() {
   const [loadingReview, setLoadingReview] = useState(false);
   const [preloadError, setPreloadError] = useState<string | null>(null);
   const [importSource, setImportSource] = useState<ImportSource>('playlist');
-  const [importedAlbums, setImportedAlbums] = useState<any[]>([]);
+  const [importedAlbums, setImportedAlbums] = useState<SpotifyAlbum[]>([]);
   const samplePlaylistUrl = 'https://open.spotify.com/playlist/0xy8aNki7WxsM42dkTOmER';
 
   const preloadedInitialData = useMemo(
@@ -121,7 +131,7 @@ function InnerReviewBuilder() {
     }
   };
 
-  const handleImageImport = (albums: any[]) => {
+  const handleImageImport = (albums: SpotifyAlbum[]) => {
     setImportedAlbums(albums);
     setPlaylistId(null);
     setPreloadedReview(null);
