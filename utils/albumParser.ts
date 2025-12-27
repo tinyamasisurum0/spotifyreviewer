@@ -33,43 +33,24 @@ export function parseAlbumsFromText(text: string): ParsedAlbum[] {
 
 /**
  * Parse a single line to extract artist and album
+ * Uses the FIRST occurrence of delimiter to split: Artist - Album Name - With Subtitle
+ * becomes artist="Artist", album="Album Name - With Subtitle"
  */
 function parseAlbumLine(line: string): Omit<ParsedAlbum, 'lineNumber'> | null {
   // Remove leading numbers (e.g., "1. Artist - Album" -> "Artist - Album")
   let cleanLine = line.replace(/^\d+[\.\)]\s*/, '');
 
-  // Try different delimiters in order of priority
-  const delimiters = [' - ', ' – ', ' — ', ': ', ' / ', ' | '];
+  // Try different delimiters in order of priority (with spaces first, then without)
+  const delimiters = [' - ', ' – ', ' — ', '-', '–', '—', ': ', ' / ', ' | '];
 
   for (const delimiter of delimiters) {
-    if (cleanLine.includes(delimiter)) {
-      const parts = cleanLine.split(delimiter);
-      if (parts.length >= 2) {
-        const artist = parts[0].trim();
-        const album = parts.slice(1).join(delimiter).trim();
+    const delimiterIndex = cleanLine.indexOf(delimiter);
+    if (delimiterIndex > 0) {
+      const artist = cleanLine.substring(0, delimiterIndex).trim();
+      const album = cleanLine.substring(delimiterIndex + delimiter.length).trim();
 
-        // Validate that both artist and album have reasonable length
-        if (artist.length > 0 && artist.length < 100 && album.length > 0 && album.length < 200) {
-          return { artist, album };
-        }
-      }
-    }
-  }
-
-  // If no delimiter found, try to detect if line contains both uppercase words (artist) and title case (album)
-  // This is a fallback and less reliable
-  const words = cleanLine.split(/\s+/);
-  if (words.length >= 3) {
-    // Look for pattern where first few words are all caps or title case
-    const potentialArtistEnd = words.findIndex((word, idx) => {
-      if (idx === 0) return false;
-      return word.length > 2 && word === word.toLowerCase();
-    });
-
-    if (potentialArtistEnd > 0) {
-      const artist = words.slice(0, potentialArtistEnd).join(' ');
-      const album = words.slice(potentialArtistEnd).join(' ');
-      if (artist.length > 0 && album.length > 0) {
+      // Validate that both artist and album have reasonable length
+      if (artist.length > 0 && artist.length < 100 && album.length > 0 && album.length < 200) {
         return { artist, album };
       }
     }

@@ -43,8 +43,80 @@ export async function processImageWithOCR(
 }
 
 /**
+ * Detect where text column starts by analyzing color saturation and variance
+ * Album covers are colorful (high saturation), text area is mostly grayscale (low saturation)
+ */
+function detectTextColumnStart(ctx: CanvasRenderingContext2D, width: number, height: number): number {
+  const sampleHeight = Math.min(height, 500);
+  const stripWidth = 10;
+  const colorfulness: number[] = [];
+
+  // Calculate "colorfulness" for each vertical strip
+  // Album covers have high color saturation, text on black bg has low saturation
+  for (let x = 0; x < width; x += stripWidth) {
+    const imageData = ctx.getImageData(x, 0, stripWidth, sampleHeight);
+    const data = imageData.data;
+
+    let totalSaturation = 0;
+    let coloredPixels = 0;
+    const pixelCount = data.length / 4;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Calculate saturation (difference from grayscale)
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const saturation = max === 0 ? 0 : (max - min) / max;
+
+      // Also check if pixel is "colorful" (not too dark, not grayscale)
+      const brightness = (r + g + b) / 3;
+      if (brightness > 30 && saturation > 0.1) {
+        coloredPixels++;
+        totalSaturation += saturation;
+      }
+    }
+
+    // Colorfulness score = percentage of colored pixels * average saturation
+    const colorScore = (coloredPixels / pixelCount) * (totalSaturation / Math.max(coloredPixels, 1));
+    colorfulness.push(colorScore);
+  }
+
+  // Find where colorful album area ends (scanning left to right)
+  // Look for sustained drop in colorfulness
+  const maxColor = Math.max(...colorfulness);
+  const threshold = maxColor * 0.08; // Text area should have very low color
+
+  let lastColorfulStrip = 0;
+  for (let i = 0; i < colorfulness.length; i++) {
+    if (colorfulness[i] > threshold) {
+      lastColorfulStrip = i;
+    }
+  }
+
+  // Text starts after last colorful strip, with padding
+  let textStartX = (lastColorfulStrip + 1) * stripWidth;
+
+  // Sanity check: text area should be between 50% and 75% from left typically
+  // If detection seems off, use a safe default
+  const minTextStart = width * 0.45;
+  const maxTextStart = width * 0.70;
+
+  if (textStartX < minTextStart || textStartX > maxTextStart) {
+    console.log('Detection outside expected range, using fallback. Detected:', textStartX);
+    textStartX = width * 0.58; // Safe default for AOTY-style layouts
+  }
+
+  console.log('Text column start at:', textStartX, 'px (', Math.round(textStartX / width * 100), '% from left)');
+
+  return textStartX;
+}
+
+/**
  * Preprocess image to improve OCR accuracy
- * For AOTY-style images, crops to the right column where text is located
+ * For AOTY-style images, automatically detects and crops to the text column
  */
 export function preprocessImage(file: File, focusOnRightColumn: boolean = true): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -53,24 +125,37 @@ export function preprocessImage(file: File, focusOnRightColumn: boolean = true):
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        // First, draw full image to analyze it
+        const analysisCanvas = document.createElement('canvas');
+        const analysisCtx = analysisCanvas.getContext('2d');
 
-        if (!ctx) {
+        if (!analysisCtx) {
           reject(new Error('Failed to get canvas context'));
           return;
         }
+
+        analysisCanvas.width = img.width;
+        analysisCanvas.height = img.height;
+        analysisCtx.drawImage(img, 0, 0);
 
         let sourceX = 0;
         let sourceY = 0;
         let sourceWidth = img.width;
         let sourceHeight = img.height;
 
-        // If focusing on right column, crop to right 30-40% of image
-        // This is where text typically appears in AOTY-style grid images
+        // Dynamically detect where text column starts
         if (focusOnRightColumn) {
-          sourceX = Math.floor(img.width * 0.65); // Start at 65% from left
-          sourceWidth = Math.floor(img.width * 0.35); // Take right 35%
+          sourceX = detectTextColumnStart(analysisCtx, img.width, img.height);
+          sourceWidth = img.width - sourceX;
+        }
+
+        // Create final canvas for OCR
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
         }
 
         // Set canvas size to cropped area

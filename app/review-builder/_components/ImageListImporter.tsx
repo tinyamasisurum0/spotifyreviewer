@@ -104,49 +104,93 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
     }
   };
 
+  // Helper: normalize text for comparison
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  // Helper: check if two strings are similar enough
+  const isSimilar = (str1: string, str2: string): boolean => {
+    const norm1 = normalizeText(str1);
+    const norm2 = normalizeText(str2);
+
+    // Exact match after normalization
+    if (norm1 === norm2) return true;
+
+    // One contains the other
+    if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+    // Check word overlap (at least 50% of words match)
+    const words1 = norm1.split(' ').filter(w => w.length > 2);
+    const words2 = norm2.split(' ').filter(w => w.length > 2);
+    if (words1.length === 0 || words2.length === 0) return false;
+
+    const matchingWords = words1.filter(w => words2.some(w2 => w2.includes(w) || w.includes(w2)));
+    return matchingWords.length >= Math.min(words1.length, words2.length) * 0.5;
+  };
+
+  // Helper: clean query for Spotify search
+  const cleanSearchQuery = (text: string): string => {
+    return text
+      .replace(/[?!.,;:'"()[\]{}]/g, ' ') // Remove punctuation
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   const searchSpotifyAlbum = async (album: MatchedAlbum): Promise<SpotifyAlbum | null> => {
     try {
-      // Try advanced search first
-      let query = `artist:${album.artist} album:${album.album}`;
-      let response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=1`);
+      const cleanArtist = cleanSearchQuery(album.artist);
+      const cleanAlbum = cleanSearchQuery(album.album);
 
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
+      // Search strategies in order of preference
+      const searchStrategies = [
+        `artist:${cleanArtist} album:${cleanAlbum}`,
+        `${cleanArtist} ${cleanAlbum}`,
+        `artist:${cleanArtist} ${cleanAlbum}`,
+        `${cleanAlbum} ${cleanArtist}`,
+      ];
 
-      let data = await response.json();
-      let searchResult = data.albums?.[0];
+      for (const query of searchStrategies) {
+        const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=5`);
 
-      // If no result, try simple query as fallback
-      if (!searchResult) {
-        query = `${album.artist} ${album.album}`;
-        response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=1`);
+        if (!response.ok) continue;
 
-        if (response.ok) {
-          data = await response.json();
-          searchResult = data.albums?.[0];
+        const data = await response.json();
+        const results = data.albums || [];
+
+        // Find best matching result
+        for (const result of results) {
+          const resultArtist = Array.isArray(result.artists) ? result.artists.join(' ') : '';
+          const resultAlbum = result.name || '';
+
+          // Verify the result actually matches what we searched for
+          const artistMatches = isSimilar(album.artist, resultArtist);
+          const albumMatches = isSimilar(album.album, resultAlbum);
+
+          if (artistMatches && albumMatches) {
+            console.log(`✓ Found match for "${album.artist} - ${album.album}":`, result.name, 'by', resultArtist);
+
+            return {
+              id: result.id,
+              name: result.name,
+              artists: Array.isArray(result.artists)
+                ? result.artists.map((name: string) => ({ name }))
+                : [{ name: 'Unknown Artist' }],
+              images: result.image ? [{ url: result.image }] : [],
+              release_date: result.releaseDate || '',
+              label: null,
+              external_urls: result.spotifyUrl ? { spotify: result.spotifyUrl } : undefined,
+            };
+          }
         }
       }
 
-      if (!searchResult) {
-        console.log(`No results found for: ${album.artist} - ${album.album}`);
-        return null;
-      }
-
-      console.log('Search result:', searchResult);
-
-      // Convert the search result format to SpotifyAlbum format
-      return {
-        id: searchResult.id,
-        name: searchResult.name,
-        artists: Array.isArray(searchResult.artists)
-          ? searchResult.artists.map((name: string) => ({ name }))
-          : [{ name: 'Unknown Artist' }],
-        images: searchResult.image ? [{ url: searchResult.image }] : [],
-        release_date: searchResult.releaseDate || '',
-        label: null,
-        external_urls: searchResult.spotifyUrl ? { spotify: searchResult.spotifyUrl } : undefined,
-      };
+      console.log(`✗ No matching result for: ${album.artist} - ${album.album}`);
+      return null;
     } catch (error) {
       console.error(`Failed to search for ${album.artist} - ${album.album}:`, error);
       return null;
