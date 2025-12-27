@@ -111,9 +111,9 @@ function detectTextColumnStart(ctx: CanvasRenderingContext2D, width: number, hei
 
   let textStartX = (lastColorfulStrip + 1) * stripWidth;
 
-  // Sanity check
-  const minTextStart = width * 0.40;
-  const maxTextStart = width * 0.75;
+  // Sanity check - allow wider range for different layouts
+  const minTextStart = width * 0.35;
+  const maxTextStart = width * 0.80;
 
   if (textStartX < minTextStart || textStartX > maxTextStart) {
     console.log('Detection outside expected range, using fallback. Detected:', textStartX);
