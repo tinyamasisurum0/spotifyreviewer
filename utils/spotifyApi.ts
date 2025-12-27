@@ -8,6 +8,9 @@ const CLIENT_SECRET = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET;
 let accessToken: string | null = null;
 let tokenExpiration: number | null = null;
 
+// Default timeout for all Spotify API requests (5 seconds)
+const API_TIMEOUT = 5000;
+
 async function getAccessToken() {
   // Eğer token varsa ve süresi dolmamışsa, mevcut tokeni kullan
   if (accessToken && tokenExpiration && Date.now() < tokenExpiration) {
@@ -15,7 +18,7 @@ async function getAccessToken() {
   }
 
   try {
-    const response = await axios.post('https://accounts.spotify.com/api/token', 
+    const response = await axios.post('https://accounts.spotify.com/api/token',
       new URLSearchParams({
         grant_type: 'client_credentials',
         client_id: CLIENT_ID!,
@@ -24,6 +27,7 @@ async function getAccessToken() {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      timeout: API_TIMEOUT,
     });
 
     accessToken = response.data.access_token;
@@ -45,7 +49,8 @@ export async function getPlaylistTracks(playlistId: string) {
       params: {
         fields: 'items(track(name,artists,album(id,name,images,release_date,label,artists,type,external_urls)))',
         limit: 100
-      }
+      },
+      timeout: API_TIMEOUT,
     });
     return response.data.items;
   } catch (error) {
@@ -93,6 +98,7 @@ export async function getAlbumsDetails(ids: string[]): Promise<Record<string, Sp
         params: {
           ids: chunk.join(','),
         },
+        timeout: API_TIMEOUT,
       });
 
       const albums = Array.isArray(response.data?.albums) ? response.data.albums : [];
@@ -132,6 +138,7 @@ export async function searchAlbums(query: string, limit = 12): Promise<SpotifyAl
         type: 'album',
         limit,
       },
+      timeout: API_TIMEOUT,
     });
 
     const albums = Array.isArray(response.data?.albums?.items) ? response.data.albums.items : [];
@@ -161,6 +168,7 @@ export async function getPlaylistDetails(playlistId: string) {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      timeout: API_TIMEOUT,
     });
     return {
       name: response.data.name,
