@@ -146,33 +146,37 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
       const cleanArtist = cleanSearchQuery(album.artist);
       const cleanAlbum = cleanSearchQuery(album.album);
 
-      // Search strategies in order of preference
-      const searchStrategies = [
-        `artist:${cleanArtist} album:${cleanAlbum}`,
-        `${cleanArtist} ${cleanAlbum}`,
-        `artist:${cleanArtist} ${cleanAlbum}`,
-        `${cleanAlbum} ${cleanArtist}`,
-      ];
+      // Optimized: single query with more results, then filter client-side
+      const query = `${cleanArtist} ${cleanAlbum}`;
 
-      for (const query of searchStrategies) {
-        const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=5`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-        if (!response.ok) continue;
+      try {
+        const response = await fetch(
+          `/api/spotify/search?q=${encodeURIComponent(query)}&limit=10`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.log(`Search failed for: ${album.artist} - ${album.album}`);
+          return null;
+        }
 
         const data = await response.json();
         const results = data.albums || [];
 
-        // Find best matching result
+        // Find best matching result from the results
         for (const result of results) {
           const resultArtist = Array.isArray(result.artists) ? result.artists.join(' ') : '';
           const resultAlbum = result.name || '';
 
-          // Verify the result actually matches what we searched for
           const artistMatches = isSimilar(album.artist, resultArtist);
           const albumMatches = isSimilar(album.album, resultAlbum);
 
           if (artistMatches && albumMatches) {
-            console.log(`✓ Found match for "${album.artist} - ${album.album}":`, result.name, 'by', resultArtist);
+            console.log(`✓ Found: "${album.artist} - ${album.album}" → ${result.name} by ${resultArtist}`);
 
             return {
               id: result.id,
@@ -187,10 +191,47 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
             };
           }
         }
-      }
 
-      console.log(`✗ No matching result for: ${album.artist} - ${album.album}`);
-      return null;
+        // If no exact match, try with just artist name
+        if (results.length === 0) {
+          const fallbackResponse = await fetch(
+            `/api/spotify/search?q=${encodeURIComponent(cleanArtist)}&limit=5`,
+            { signal: controller.signal }
+          );
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            const fallbackResults = fallbackData.albums || [];
+
+            for (const result of fallbackResults) {
+              const resultArtist = Array.isArray(result.artists) ? result.artists.join(' ') : '';
+              if (isSimilar(album.artist, resultArtist) && isSimilar(album.album, result.name || '')) {
+                console.log(`✓ Found (fallback): "${album.artist} - ${album.album}" → ${result.name}`);
+                return {
+                  id: result.id,
+                  name: result.name,
+                  artists: Array.isArray(result.artists)
+                    ? result.artists.map((name: string) => ({ name }))
+                    : [{ name: 'Unknown Artist' }],
+                  images: result.image ? [{ url: result.image }] : [],
+                  release_date: result.releaseDate || '',
+                  label: null,
+                  external_urls: result.spotifyUrl ? { spotify: result.spotifyUrl } : undefined,
+                };
+              }
+            }
+          }
+        }
+
+        console.log(`✗ No match: ${album.artist} - ${album.album}`);
+        return null;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log(`⏱ Timeout: ${album.artist} - ${album.album}`);
+        }
+        throw err;
+      }
     } catch (error) {
       console.error(`Failed to search for ${album.artist} - ${album.album}:`, error);
       return null;
@@ -214,7 +255,7 @@ export default function ImageListImporter({ onImportComplete }: ImageListImporte
 
       setParsedAlbums([...updatedAlbums]);
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 150)); // Reduced delay
     }
 
     setIsSearching(false);

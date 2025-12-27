@@ -44,69 +44,80 @@ export async function processImageWithOCR(
 
 /**
  * Detect where text column starts by analyzing color saturation and variance
- * Album covers are colorful (high saturation), text area is mostly grayscale (low saturation)
+ * Samples multiple vertical sections of the image for accuracy
  */
 function detectTextColumnStart(ctx: CanvasRenderingContext2D, width: number, height: number): number {
-  const sampleHeight = Math.min(height, 500);
   const stripWidth = 10;
-  const colorfulness: number[] = [];
 
-  // Calculate "colorfulness" for each vertical strip
-  // Album covers have high color saturation, text on black bg has low saturation
-  for (let x = 0; x < width; x += stripWidth) {
-    const imageData = ctx.getImageData(x, 0, stripWidth, sampleHeight);
-    const data = imageData.data;
+  // Sample multiple horizontal bands across the full image height
+  const numBands = 5;
+  const bandHeight = Math.floor(height / numBands);
+  const allColorfulness: number[][] = [];
 
-    let totalSaturation = 0;
-    let coloredPixels = 0;
-    const pixelCount = data.length / 4;
+  for (let band = 0; band < numBands; band++) {
+    const bandY = band * bandHeight;
+    const colorfulness: number[] = [];
 
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+    for (let x = 0; x < width; x += stripWidth) {
+      const imageData = ctx.getImageData(x, bandY, stripWidth, bandHeight);
+      const data = imageData.data;
 
-      // Calculate saturation (difference from grayscale)
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const saturation = max === 0 ? 0 : (max - min) / max;
+      let totalSaturation = 0;
+      let coloredPixels = 0;
+      const pixelCount = data.length / 4;
 
-      // Also check if pixel is "colorful" (not too dark, not grayscale)
-      const brightness = (r + g + b) / 3;
-      if (brightness > 30 && saturation > 0.1) {
-        coloredPixels++;
-        totalSaturation += saturation;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const saturation = max === 0 ? 0 : (max - min) / max;
+        const brightness = (r + g + b) / 3;
+
+        if (brightness > 30 && saturation > 0.1) {
+          coloredPixels++;
+          totalSaturation += saturation;
+        }
       }
-    }
 
-    // Colorfulness score = percentage of colored pixels * average saturation
-    const colorScore = (coloredPixels / pixelCount) * (totalSaturation / Math.max(coloredPixels, 1));
-    colorfulness.push(colorScore);
+      const colorScore = (coloredPixels / pixelCount) * (totalSaturation / Math.max(coloredPixels, 1));
+      colorfulness.push(colorScore);
+    }
+    allColorfulness.push(colorfulness);
   }
 
-  // Find where colorful album area ends (scanning left to right)
-  // Look for sustained drop in colorfulness
-  const maxColor = Math.max(...colorfulness);
-  const threshold = maxColor * 0.08; // Text area should have very low color
+  // Average colorfulness across all bands
+  const avgColorfulness: number[] = [];
+  for (let i = 0; i < allColorfulness[0].length; i++) {
+    let sum = 0;
+    for (let band = 0; band < numBands; band++) {
+      sum += allColorfulness[band][i];
+    }
+    avgColorfulness.push(sum / numBands);
+  }
+
+  // Find where colorful album area ends
+  const maxColor = Math.max(...avgColorfulness);
+  const threshold = maxColor * 0.08;
 
   let lastColorfulStrip = 0;
-  for (let i = 0; i < colorfulness.length; i++) {
-    if (colorfulness[i] > threshold) {
+  for (let i = 0; i < avgColorfulness.length; i++) {
+    if (avgColorfulness[i] > threshold) {
       lastColorfulStrip = i;
     }
   }
 
-  // Text starts after last colorful strip, with padding
   let textStartX = (lastColorfulStrip + 1) * stripWidth;
 
-  // Sanity check: text area should be between 50% and 75% from left typically
-  // If detection seems off, use a safe default
-  const minTextStart = width * 0.45;
-  const maxTextStart = width * 0.70;
+  // Sanity check
+  const minTextStart = width * 0.40;
+  const maxTextStart = width * 0.75;
 
   if (textStartX < minTextStart || textStartX > maxTextStart) {
     console.log('Detection outside expected range, using fallback. Detected:', textStartX);
-    textStartX = width * 0.58; // Safe default for AOTY-style layouts
+    textStartX = width * 0.55;
   }
 
   console.log('Text column start at:', textStartX, 'px (', Math.round(textStartX / width * 100), '% from left)');
@@ -148,6 +159,12 @@ export function preprocessImage(file: File, focusOnRightColumn: boolean = true):
           sourceX = detectTextColumnStart(analysisCtx, img.width, img.height);
           sourceWidth = img.width - sourceX;
         }
+
+        console.log('Image processing:', {
+          originalSize: `${img.width}x${img.height}`,
+          cropArea: `x:${sourceX}, y:${sourceY}, w:${sourceWidth}, h:${sourceHeight}`,
+          focusOnRightColumn
+        });
 
         // Create final canvas for OCR
         const canvas = document.createElement('canvas');
