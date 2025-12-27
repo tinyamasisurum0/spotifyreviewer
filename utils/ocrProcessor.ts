@@ -71,9 +71,6 @@ export function preprocessImage(file: File, focusOnRightColumn: boolean = true):
         if (focusOnRightColumn) {
           sourceX = Math.floor(img.width * 0.65); // Start at 65% from left
           sourceWidth = Math.floor(img.width * 0.35); // Take right 35%
-          sourceY = 0;
-          // For testing: limit to max 300px height
-          sourceHeight = Math.min(300, img.height);
         }
 
         // Set canvas size to cropped area
