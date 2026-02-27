@@ -74,8 +74,8 @@ export default function AlbumSearchClient() {
         <div className="rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-3 text-xs text-gray-300">
           <p className="font-semibold text-emerald-200">Keys</p>
           <p className="mt-1 text-gray-400">
-            Uses the same client credentials as playlist analysis. Make sure <code>NEXT_PUBLIC_SPOTIFY_CLIENT_ID</code> and{' '}
-            <code>NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET</code> are set.
+            Uses the same client credentials as playlist analysis. Make sure <code>SPOTIFY_CLIENT_ID</code> and{' '}
+            <code>SPOTIFY_CLIENT_SECRET</code> are set.
           </p>
         </div>
       </div>

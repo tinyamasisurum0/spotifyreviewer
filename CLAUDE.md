@@ -4,95 +4,73 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Next.js 14 app (App Router) that creates visual album reviews and tier lists from Spotify playlists. Users can analyze playlists, add ratings/notes, reorder albums, and export shareable images. Data persists to Vercel Postgres.
+A Next.js 14 app (App Router) that creates visual album reviews and tier lists from Spotify playlists. Users can analyze playlists, add ratings/notes, reorder albums, and export shareable images. Includes OCR-based image import for album lists. Data persists to Vercel Postgres.
 
 **Live Site**: myrating.space
-**Key Features**: Spotify playlist analysis, album reviews with multiple display modes, tier list maker with drag-and-drop, image export (HTML canvas)
 
 ## Development Commands
 
 ```bash
-# Development
 npm run dev          # Start dev server at http://localhost:3000
-
-# Production
 npm run build        # Build for production
-npm start            # Start production server
-
-# Linting
 npm run lint         # Run ESLint
 ```
 
-## Environment Variables
-
-Required variables (add to `.env.local`):
-
-```bash
-# Spotify API (required for playlist fetching and album search)
-NEXT_PUBLIC_SPOTIFY_CLIENT_ID=***
-NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET=***
-
-# Vercel Postgres (required for reviews and tier lists)
-POSTGRES_URL=***
-# OR for connection pooling:
-POSTGRES_URL_NON_POOLING=***
-```
-
-**Note**: Use `npx vercel env pull` to sync from Vercel deployment.
+Use `npx vercel env pull` to sync environment variables from Vercel deployment.
 
 ## Architecture
 
 ### Data Flow
 
 1. **Spotify Integration** (`utils/spotifyApi.ts`):
-   - Client credentials OAuth flow with token caching
-   - Fetches playlist tracks and metadata via Spotify Web API
-   - Album search for manual additions
+   - Client credentials OAuth flow with in-memory token caching
+   - 5-second timeout on all Spotify API calls (prevents serverless function timeout)
+   - Album details fetched in batches of 20; playlist tracks limited to 100 per request
    - All Spotify calls happen server-side to protect credentials
 
-2. **Database Layer** (`lib/reviews.ts`, `lib/tierLists.ts`):
-   - Auto-creates Postgres tables on first use (`ensureSchema()`)
-   - Reviews: Two tables (`reviews` + `review_albums`) with CASCADE delete
-   - Tier Lists: Two tables (`tier_lists` + `tier_list_albums`) with CASCADE delete
-   - Uses `@vercel/postgres` with connection pooling via `withClient()`
-   - Transactions wrap multi-row inserts
+2. **OCR Image Import** (`utils/ocrProcessor.ts`, `utils/albumParser.ts`):
+   - Users upload images containing album lists (e.g., screenshots of ranked lists)
+   - Tesseract.js processes images with preprocessing (grayscale, contrast enhancement)
+   - Automatic text column detection (35%-80% range) to extract album names
+   - Parsed albums are fuzzy-matched against Spotify search results
+   - UI component: `app/review-builder/_components/ImageListImporter.tsx`
 
-3. **API Routes** (`app/api/`):
-   - `GET/POST /api/reviews` - List all reviews or create new
-   - `GET/DELETE /api/reviews/[id]` - Fetch/delete by ID
-   - `GET/POST /api/tier-lists` - List all tier lists or create new
+3. **Database Layer** (`lib/reviews.ts`, `lib/tierLists.ts`):
+   - Auto-creates Postgres tables on first use via `ensureSchema()` (singleton Promise cache)
+   - Reviews: `reviews` + `review_albums` tables with CASCADE delete
+   - Tier Lists: `tier_lists` + `tier_list_albums` tables with CASCADE delete (JSONB for tier_metadata)
+   - Always use `withClient()` wrapper for connection management
+   - Transactions wrap multi-row inserts; UUIDs from `crypto.randomUUID()`
+
+4. **API Routes** (`app/api/`):
+   - `GET/POST /api/reviews` - List or create reviews
+   - `GET /api/reviews/[id]` - Fetch review by ID
+   - `GET/POST /api/tier-lists` - List or create tier lists
    - `GET /api/spotify/search` - Album search proxy
-   - All routes use `export const dynamic = 'force-dynamic'` to prevent static optimization
+   - All routes use `export const dynamic = 'force-dynamic'`
 
-4. **Client Components**:
-   - `ReviewDetailClient.tsx` - Displays individual review with albums
-   - `TierListDetailClient.tsx` - Tier list with drag-and-drop (@dnd-kit)
-   - `PlaylistAnalyzer.tsx` - Main review builder interface
-   - Image export uses `html-to-image` library (canvas rendering)
+5. **Server Actions** (`app/admin/actions.ts`):
+   - Delete operations use Next.js Server Actions, NOT API routes
+   - `deleteReview()` and `deleteTierList()` with `revalidatePath()` for cache invalidation
+   - Called from admin panel client components
+
+6. **SEO** (`app/robots.ts`, `app/sitemap.ts`, `app/reviews/[id]/og/route.ts`):
+   - Dynamic robots.txt and sitemap generation
+   - Open Graph images generated on-demand per review via route handlers
 
 ### Type System
 
-- `types/review.ts`: Review types and 4 display modes (`review | plain | rating | both`)
-- `types/tier-list.ts`: Tier list types with 5 tiers (`unranked | s | a | b | c`)
-- `data/tierMaker.ts`: Default tier metadata (colors, labels) and validation logic
+- `types/review.ts`: `ReviewMode = 'review' | 'plain' | 'rating' | 'both'`
+- `types/tier-list.ts`: `TierId = 'unranked' | 's' | 'a' | 'b' | 'c'`
+- `data/tierMaker.ts`: Default tier metadata, validation logic
+- `data/tierPalette.ts`: Color palettes for each tier
 
-### Routing Structure
+### Key Components
 
-```
-app/
-├── page.tsx                    # Landing page
-├── review-builder/page.tsx     # Interactive review creation tool
-├── reviews/
-│   ├── page.tsx                # Gallery of all reviews
-│   └── [id]/
-│       ├── page.tsx            # Individual review display
-│       └── og/route.ts         # Open Graph image generation
-├── tier-maker/page.tsx         # Tier list creation interface
-├── tier-lists/[id]/page.tsx    # Individual tier list display
-├── spotify-search/page.tsx     # Album search interface
-├── admin/page.tsx              # Admin panel (noindex)
-└── blog/page.tsx               # Blog/about page
-```
+- `PlaylistAnalyzer.tsx` - Main review builder (largest component)
+- `ReviewDetailClient.tsx` - Individual review display with mode-dependent rendering
+- `TierListDetailClient.tsx` - Tier list with @dnd-kit drag-and-drop
+- `components/rankDecorations.ts` - Rank decoration logic
 
 ## Common Development Patterns
 
@@ -108,36 +86,28 @@ app/
 - Schema auto-initializes on first API call (no migrations needed)
 - Always use `withClient()` wrapper for connection management
 - Wrap multi-row operations in transactions (`BEGIN/COMMIT/ROLLBACK`)
-- UUIDs generated with `randomUUID()` from `crypto` module
 
 ### Image Export
 
-- Uses `html-to-image` library (toBlob/toPng methods)
+- Uses `html-to-image` library (toBlob/toPng)
 - Renders hidden DOM element, captures to canvas, converts to data URL
 - Stored as `image_data_url` in database for static hosting
-- Open Graph images generated on-demand via route handlers
-
-### Spotify API Patterns
-
-- Token cached in-memory with expiration check
-- Album details fetched in batches of 20 (API limit)
-- Playlist tracks limited to 100 items per request
-- Extract playlist ID from URL with `extractPlaylistIdFromUrl()`
 
 ## Tech Stack
 
 - **Framework**: Next.js 14 (App Router, React Server Components)
 - **Database**: Vercel Postgres (`@vercel/postgres`)
-- **Styling**: Tailwind CSS with custom theme, `class-variance-authority` for component variants
-- **UI Components**: Custom components built on Tailwind, lucide-react icons
-- **Drag & Drop**: @dnd-kit (tier lists only)
+- **Styling**: Tailwind CSS with shadcn/ui-style HSL CSS variables, `class-variance-authority`
+- **Drag & Drop**: @dnd-kit (tier lists)
 - **Image Generation**: html-to-image, html2canvas
-- **Analytics**: Vercel Analytics
+- **OCR**: Tesseract.js for image-to-text album import
+- **Icons**: lucide-react
 
 ## Important Notes
 
-- The `spotifyreviewer/` subdirectory appears to be a duplicate/old version - focus on root-level code
-- Admin routes use `X-Robots-Tag: noindex, nofollow` header (see `next.config.js`)
-- Next.js image optimization configured for `i.scdn.co` and `mosaic.scdn.co` (Spotify CDN)
+- **Dark mode is forced** at layout level (`<html className="dark">`) - all UI is dark-only
+- The `spotifyreviewer/` subdirectory is a legacy duplicate - focus on root-level code only
+- Two `next.config` files exist; `next.config.js` is the active one (`.mjs` is unused)
+- Next.js image optimization configured for `i.scdn.co` and `mosaic.scdn.co` (Spotify CDN) with avif/webp
+- Admin routes use `X-Robots-Tag: noindex, nofollow` header via `next.config.js`
 - All client-side state is ephemeral; reviews/tier lists must be explicitly saved via API
-- Review modes control what metadata displays (notes, ratings, labels, release dates)

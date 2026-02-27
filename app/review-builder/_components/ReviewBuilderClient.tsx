@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Copy, Link as LinkIcon, FileImage } from 'lucide-react';
-import { extractPlaylistIdFromUrl } from '@/utils/spotifyApi';
+import { extractPlaylistIdFromUrl } from '@/utils/spotify';
 import PlaylistAnalyzer, { InputMode } from '@/components/PlaylistAnalyzer';
 import { DragDropContext } from 'react-beautiful-dnd';
 import type { StoredReview } from '@/types/review';

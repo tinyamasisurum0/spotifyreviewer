@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { getPlaylistTracks, getPlaylistDetails, getAlbumsDetails } from '../utils/spotifyApi';
 import {
   DndContext,
   closestCenter,
@@ -611,71 +610,52 @@ export default function PlaylistAnalyzer({
         setIsSavingReview(false);
         setIsPreparingDownload(false);
 
-        const tracks = await getPlaylistTracks(playlistId);
-        const { name, owner, image } = await getPlaylistDetails(playlistId);
+        const res = await fetch('/api/spotify/playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: playlistId }),
+        });
+        if (!res.ok) throw new Error('Failed to load playlist');
+        const { tracks, playlist, albumDetails } = await res.json();
 
         if (isCancelled) {
           return;
         }
 
-        setPlaylistName(name);
-        setPlaylistOwner(owner);
-        setPlaylistImage(image ?? null);
+        setPlaylistName(playlist.name);
+        setPlaylistOwner(playlist.owner);
+        setPlaylistImage(playlist.image ?? null);
 
-        let uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
+        const uniqueAlbums = tracks.reduce((acc: Album[], item: SpotifyTrack) => {
           const spotifyAlbum = item.track.album;
           const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
           const alreadyExists = acc.some((existing) => existing.id === albumId);
           if (!alreadyExists) {
+            const details = albumDetails[albumId];
+            const mergedImages =
+              spotifyAlbum.images && spotifyAlbum.images.length > 0
+                ? spotifyAlbum.images
+                : details?.images ?? [];
+            const mergedLabel =
+              sanitizeLabel(spotifyAlbum.label) ?? sanitizeLabel(details?.label) ?? null;
+            const mergedReleaseDate =
+              spotifyAlbum.release_date || details?.release_date || '';
+            const mergedSpotifyUrl =
+              spotifyAlbum.external_urls?.spotify ?? details?.external_urls?.spotify ?? null;
             acc.push({
               ...spotifyAlbum,
               id: albumId,
               notes: '',
               rating: null,
-              spotifyUrl: spotifyAlbum.external_urls?.spotify ?? null,
-              label: sanitizeLabel(spotifyAlbum.label),
+              spotifyUrl: mergedSpotifyUrl,
+              label: mergedLabel,
+              images: mergedImages,
+              release_date: mergedReleaseDate,
+              external_urls: spotifyAlbum.external_urls ?? details?.external_urls,
             });
           }
           return acc;
         }, []);
-
-        const albumIdsForDetails = uniqueAlbums
-          .map((album: Album) => album.id ?? '')
-          .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
-
-        if (albumIdsForDetails.length > 0) {
-          try {
-            const albumDetails = await getAlbumsDetails(albumIdsForDetails);
-            uniqueAlbums = uniqueAlbums.map((album: Album) => {
-              const details = albumDetails[album.id];
-              if (!details) {
-                return album;
-              }
-              const mergedImages =
-                album.images && album.images.length > 0
-                  ? album.images
-                  : Array.isArray(details.images)
-                    ? details.images
-                    : [];
-              const mergedLabel =
-                sanitizeLabel(album.label) ?? sanitizeLabel(details.label) ?? null;
-              const mergedReleaseDate =
-                album.release_date || details.release_date || album.release_date;
-              const mergedSpotifyUrl =
-                album.spotifyUrl ?? details.external_urls?.spotify ?? null;
-              return {
-                ...album,
-                label: mergedLabel,
-                images: mergedImages,
-                release_date: mergedReleaseDate,
-                spotifyUrl: mergedSpotifyUrl,
-                external_urls: album.external_urls ?? details.external_urls,
-              };
-            });
-          } catch (detailError) {
-            console.error('Failed to enrich album details', detailError);
-          }
-        }
 
         setAlbums(uniqueAlbums);
       } catch {

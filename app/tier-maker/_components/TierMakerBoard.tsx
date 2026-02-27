@@ -22,13 +22,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { ExternalLink, Loader2, Search, Sparkles } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
-import {
-  getAlbumsDetails,
-  getPlaylistDetails,
-  getPlaylistTracks,
-  extractPlaylistIdFromUrl,
-  type SpotifyAlbumSearchResult,
-} from '@/utils/spotifyApi';
+import { extractPlaylistIdFromUrl } from '@/utils/spotify';
+import type { SpotifyAlbumSearchResult } from '@/utils/spotifyApi';
 import {
   tierDefinitions,
   createDefaultTierMetadata,
@@ -628,53 +623,37 @@ export default function TierMakerBoard() {
       setPlaylistLoading(true);
       setPlaylistError(null);
 
-      const tracks = await getPlaylistTracks(playlistId);
-      const { name, owner, image } = await getPlaylistDetails(playlistId);
+      const res = await fetch('/api/spotify/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: playlistId }),
+      });
+      if (!res.ok) throw new Error('Failed to load playlist');
+      const { tracks, playlist, albumDetails } = await res.json();
 
-      setPlaylistName(name);
-      setPlaylistOwner(owner);
-      setPlaylistImage(image ?? null);
+      setPlaylistName(playlist.name);
+      setPlaylistOwner(playlist.owner);
+      setPlaylistImage(playlist.image ?? null);
 
-      let uniqueAlbums = tracks.reduce((acc: SpotifyAlbum[], item: SpotifyTrack) => {
+      const uniqueAlbums = tracks.reduce((acc: SpotifyAlbum[], item: SpotifyTrack) => {
         const spotifyAlbum = item.track.album;
         const albumId = spotifyAlbum.id || spotifyAlbum.name || `album-${acc.length}`;
         if (!acc.some((existing) => existing.id === albumId)) {
+          const details = albumDetails[albumId];
           acc.push({
             ...spotifyAlbum,
             id: albumId,
+            label: sanitizeLabel(spotifyAlbum.label) ?? sanitizeLabel(details?.label),
+            images:
+              spotifyAlbum.images && spotifyAlbum.images.length > 0
+                ? spotifyAlbum.images
+                : details?.images ?? [],
+            release_date: spotifyAlbum.release_date ?? details?.release_date ?? '',
+            external_urls: spotifyAlbum.external_urls ?? details?.external_urls,
           });
         }
         return acc;
       }, []);
-
-      const albumIds = uniqueAlbums
-        .map((album: SpotifyAlbum) => album.id ?? '')
-        .filter((albumId: string) => albumId.length > 0 && !albumId.startsWith('album-'));
-      if (albumIds.length > 0) {
-        try {
-          const extraDetails = await getAlbumsDetails(albumIds);
-          uniqueAlbums = uniqueAlbums.map((album: SpotifyAlbum) => {
-            const details = extraDetails[album.id];
-            if (!details) {
-              return album;
-            }
-            return {
-              ...album,
-              label: sanitizeLabel(album.label) ?? sanitizeLabel(details.label),
-              images:
-                album.images && album.images.length > 0
-                  ? album.images
-                  : Array.isArray(details.images)
-                    ? details.images
-                    : [],
-              release_date: album.release_date ?? details.release_date ?? album.release_date,
-              external_urls: album.external_urls ?? details.external_urls,
-            };
-          });
-        } catch (detailError) {
-          console.error('Failed to enrich albums for tier maker', detailError);
-        }
-      }
 
       const mappedAlbums: TierListAlbum[] = uniqueAlbums.map((album: SpotifyAlbum) => ({
         id: album.id,
@@ -937,8 +916,15 @@ export default function TierMakerBoard() {
       let albumDetailsMap: Record<string, { label?: string | null }> = {};
       if (albumIds.length > 0) {
         try {
-          const details = await getAlbumsDetails(albumIds);
-          albumDetailsMap = details;
+          const res = await fetch('/api/spotify/albums', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: albumIds }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            albumDetailsMap = data.albums ?? {};
+          }
         } catch (detailError) {
           console.error('Failed to enrich search results with album details', detailError);
         }

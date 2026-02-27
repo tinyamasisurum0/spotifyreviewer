@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const SPOTIFY_BASE_URL = 'https://api.spotify.com/v1';
-const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
-const CLIENT_SECRET = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET;
+const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 
 // Token yönetimi için basit bir cache sistemi
 let accessToken: string | null = null;
@@ -85,41 +85,48 @@ export async function getAlbumsDetails(ids: string[]): Promise<Record<string, Sp
   }
 
   const token = await getAccessToken();
-  const result: Record<string, SpotifyAlbumDetail> = {};
   const chunkSize = 20;
+  const chunks: string[][] = [];
 
   for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-    const chunk = uniqueIds.slice(i, i + chunkSize);
-    try {
-      const response = await axios.get(`${SPOTIFY_BASE_URL}/albums`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        params: {
-          ids: chunk.join(','),
-        },
-        timeout: API_TIMEOUT,
-      });
-
-      const albums = Array.isArray(response.data?.albums) ? response.data.albums : [];
-      albums.forEach((album: any) => {
-        if (album && typeof album.id === 'string') {
-          result[album.id] = {
-            id: album.id,
-            name: album.name ?? '',
-            label: album.label ?? null,
-            images: Array.isArray(album.images) ? album.images : [],
-            release_date: album.release_date ?? '',
-            external_urls: album.external_urls,
-          };
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching album details:', error);
-    }
+    chunks.push(uniqueIds.slice(i, i + chunkSize));
   }
 
-  return result;
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const chunkResult: Record<string, SpotifyAlbumDetail> = {};
+      try {
+        const response = await axios.get(`${SPOTIFY_BASE_URL}/albums`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            ids: chunk.join(','),
+          },
+          timeout: API_TIMEOUT,
+        });
+
+        const albums = Array.isArray(response.data?.albums) ? response.data.albums : [];
+        albums.forEach((album: any) => {
+          if (album && typeof album.id === 'string') {
+            chunkResult[album.id] = {
+              id: album.id,
+              name: album.name ?? '',
+              label: album.label ?? null,
+              images: Array.isArray(album.images) ? album.images : [],
+              release_date: album.release_date ?? '',
+              external_urls: album.external_urls,
+            };
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching album details:', error);
+      }
+      return chunkResult;
+    })
+  );
+
+  return Object.assign({}, ...results);
 }
 
 export async function searchAlbums(query: string, limit = 12): Promise<SpotifyAlbumSearchResult[]> {
@@ -184,7 +191,4 @@ export async function getPlaylistDetails(playlistId: string) {
 }
 
 
-export function extractPlaylistIdFromUrl(url: string): string | null {
-  const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
-  return match ? match[1] : null;
-}
+export { extractPlaylistIdFromUrl } from './spotify';
