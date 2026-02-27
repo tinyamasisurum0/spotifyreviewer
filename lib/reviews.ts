@@ -134,7 +134,7 @@ export async function readReviews(): Promise<StoredReview[]> {
           r.playlist_name,
           r.playlist_owner,
           r.playlist_image,
-          r.image_data_url,
+          NULL           AS image_data_url,
           r.review_mode,
           r.created_at,
           a.id          AS album_row_id,
